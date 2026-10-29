@@ -1,5 +1,5 @@
-import { showVersion, VERSION } from "./version.js?v=0.5.0";
-import * as db from "./db.js?v=0.5.0";
+import { showVersion, VERSION } from "./version.js?v=0.5.1";
+import * as db from "./db.js?v=0.5.1";
 
 showVersion();
 showSpheres();

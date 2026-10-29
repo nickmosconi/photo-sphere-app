@@ -1,5 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.5.0";
-import { photoOrientation } from "./stitch-settings.js?v=0.5.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.5.1";
+import { photoOrientation } from "./stitch-settings.js?v=0.5.1";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -213,10 +213,6 @@ export class Stitcher {
       return;
     }
 
-    if (!this.out) {
-      [this.out, this.outFbo] = renderTarget(gl, gl.RGBA8, width, height);
-      this.pixels = new ImageData(width, height);
-    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.outFbo);
     gl.uniform1i(n.uniforms.uFlip, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -238,7 +234,13 @@ export class Stitcher {
     this.canvas.width = width;
     this.canvas.height = height;
     this.canvasFits = gl.drawingBufferWidth === width && gl.drawingBufferHeight === height;
-    if (!this.canvasFits) this.canvas.width = this.canvas.height = 1; // free it; not used
+    if (!this.canvasFits) {
+      this.canvas.width = this.canvas.height = 1; // free it; not used
+      // Made here, not while drawing: creating a texture changes what's bound, and binding it
+      // where the float buffer was would make the final pass read from what it draws into.
+      [this.out, this.outFbo] = renderTarget(gl, gl.RGBA8, width, height);
+      this.pixels = new ImageData(width, height);
+    }
     this.width = width;
     this.height = height;
   }
