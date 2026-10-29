@@ -123,3 +123,15 @@ On the iPhone, v0.6.0 crashed after capturing ("A problem repeatedly occurred"),
 | Crash recovery: progress is written down while making a sphere; if the page reloads with it still there, the app says which step crashed and uses 4096 from then on | Prevents repeated crashes |
 
 Tested on the PC: two strips match one pass (mean difference 0.001 out of 255); a 5792 sphere takes 30 s; a simulated crash showed the message and the next sphere was made at 4096. Still unverified: whether 5792 now fits in the iPhone's memory.
+
+### v0.7.0 (2026-10-28): 8192-wide spheres on the phone
+
+| Change | Details | Tested on the PC |
+|---|---|---|
+| 8192 × 4096 spheres | Made in 4 strips; each finished strip goes straight into Sphere Cam's own JPEG encoder (js/jpeg-encoder.js), so the 33-megapixel image never has to fit in a canvas (Safari's limit is about 16.7 million pixels). About 200 MB at most. Falls back to 5792, then 4096, after a crash. | 8192 × 4096 sphere, 5.3 MB, 62 s on the PC |
+| JPEG encoder | Baseline JPEG, 4:2:0, standard tables, written a band of rows at a time; no library | Same quality as the browser's encoder at 92 (38.05 vs 38.06 dB on a test image); files about 30% larger |
+| Viewer halves | Big spheres also store left and right halves (4096 × 4096 each) that the viewer shows as two parts of the sphere; the full image is what Save / Share sends | Joins between halves invisible (checked straight ahead and behind) |
+| Fewer, faster photo reads | Each strip skips photos whose traced edges can't reach it; strips decode 2048-pixel copies made in the first pass instead of the 12-megapixel originals | 58 reads; strips 2–5 s each instead of 13–18 s |
+| Light sharpening | Unsharp mask over each 3×3 neighborhood when finishing the sphere; strength 0.6 (1.2 looked gritty). Adjustable in the Lab. | Visibly crisper brush marks |
+
+Still unverified on the iPhone: time to make an 8192 sphere (the PC needs about a minute; saving each 2048 copy was slow in the PC test browser) and whether it stays within memory.

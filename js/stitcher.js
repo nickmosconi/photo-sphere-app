@@ -1,5 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.1";
-import { photoOrientation } from "./stitch-settings.js?v=0.6.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.7.0";
+import { photoOrientation } from "./stitch-settings.js?v=0.7.0";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -64,12 +64,30 @@ const NORMALIZE_FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D uAcc;
 uniform bool uFlip; // when reading pixels back, so rows come out top to bottom like an image
+uniform float uSharpen; // 0 = off; how much of the difference from a 3×3 blur to add back
 out vec4 outColor;
+vec3 colorAt(ivec2 p) {
+  p = clamp(p, ivec2(0), textureSize(uAcc, 0) - 1);
+  vec4 a = texelFetch(uAcc, p, 0);
+  return a.a > 0.0 ? a.rgb / a.a : vec3(0.5);
+}
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   if (uFlip) p.y = textureSize(uAcc, 0).y - 1 - p.y;
   vec4 a = texelFetch(uAcc, p, 0);
-  outColor = a.a > 0.0 ? vec4(a.rgb / a.a, 1.0) : vec4(0.5, 0.5, 0.5, 1.0); // gray where nothing was captured
+  if (a.a <= 0.0) {
+    outColor = vec4(0.5, 0.5, 0.5, 1.0); // gray where nothing was captured
+    return;
+  }
+  vec3 c = a.rgb / a.a;
+  if (uSharpen > 0.0) {
+    vec3 blur = vec3(0.0);
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) blur += colorAt(p + ivec2(dx, dy));
+    }
+    c += uSharpen * (c - blur / 9.0);
+  }
+  outColor = vec4(c, 1.0);
 }`;
 
 export class Stitcher {
@@ -91,7 +109,7 @@ export class Stitcher {
     this.canvasFits = false; // whether the hidden canvas can be the full output size
     this.acc = null; // float buffer the photos are added into
     this.accFbo = null;
-    this.out = null; // final 8-bit image, only for outputs too big for the canvas
+    this.out = null; // final 8-bit image, for read-back (outputs too big for the canvas, or strips)
     this.outFbo = null;
     this.pixels = null;
   }
@@ -106,8 +124,9 @@ export class Stitcher {
   // Stitches the photos given to setPhotos and draws the panorama into `target`
   // (a 2D canvas, resized to fit). Fast enough to re-run on every slider move.
   // settings: { outputWidth, fovLongDeg, yawOffsetDeg, pitchOffsetDeg, rollOffsetDeg,
-  //             feather, sharpness, matchExposure, vignette, useAligned, refine, tint, yaw0Deg }
+  //             feather, sharpness, sharpen, matchExposure, vignette, useAligned, refine, tint, yaw0Deg }
   stitch(settings, target) {
+    this.readBack = false;
     this.#begin(settings, 0, 1);
     this.photos.forEach((photo, i) => this.#drawPhoto(photo, i, this.photos.length, settings));
     this.#finish(target, 0);
@@ -115,22 +134,22 @@ export class Stitcher {
 
   // Same result, but with only one photo on the GPU at a time and the panorama made in `strips`
   // horizontal strips, to save memory on phones. photos: [{ quaternion, quaternionAligned?,
-  // quaternionRefined?, gain? }] without images; loadImage(i, strip) resolves to photo i's image,
-  // which is freed (see freeImage) once it is on the GPU. Photos that can't reach a strip are
-  // skipped for it, so with 2 strips only the horizon photos are read twice.
+  // quaternionRefined?, gain?, width?, height? }] without images; loadImage(i, strip) resolves to
+  // photo i's image, which is freed (see freeImage) once it is on the GPU. Photos that can't reach
+  // a strip are skipped for it.
+  // target is a 2D canvas (the whole panorama is drawn into it), or a function
+  // onStrip(rgba, width, rows, y) that receives each finished strip's pixels, top to bottom,
+  // so even a panorama bigger than any canvas can be saved piece by piece.
   async stitchOneByOne(settings, target, photos, loadImage, freeImage, strips = 1) {
-    const offset = cameraOffset(settings);
+    this.readBack = typeof target === "function";
+    const ranges = photos.map((meta) => pitchRange(meta, settings));
     for (let strip = 0; strip < strips; strip++) {
       this.#begin(settings, strip, strips);
       // Pitch range of this strip (strip 0 is at the top).
       const top = 90 - (180 * strip) / strips;
       const bottom = 90 - (180 * (strip + 1)) / strips;
       for (const [i, meta] of photos.entries()) {
-        if (strips > 1) {
-          const m = toMatrix3(multiply(photoOrientation(meta, settings), offset));
-          const pitch = (Math.asin(Math.max(-1, Math.min(1, -m[8]))) * 180) / Math.PI;
-          if (pitch - PHOTO_REACH_DEG >= top || pitch + PHOTO_REACH_DEG <= bottom) continue;
-        }
+        if (ranges[i].min >= top || ranges[i].max <= bottom) continue;
         const image = await loadImage(i, strip);
         const photo = this.#upload({ ...meta, image });
         freeImage?.(image);
@@ -167,10 +186,11 @@ export class Stitcher {
     const gl = this.gl;
     this.fullWidth = settings.outputWidth;
     this.fullHeight = settings.outputWidth / 2;
-    this.#ensureSize(this.fullWidth, this.fullHeight / strips);
+    this.#ensureSize(this.fullWidth, this.fullHeight / strips, this.readBack);
     // vUv.y runs from 0 at the bottom to 1 at the top; strip 0 is the top one.
     this.uvOffset = [0, (strips - 1 - strip) / strips];
     this.uvScale = [1, 1 / strips];
+    this.sharpen = settings.sharpen ?? 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -219,7 +239,20 @@ export class Stitcher {
     const n = this.normalizeProgram;
     gl.useProgram(n.program);
     gl.uniform1i(n.uniforms.uAcc, 0);
+    gl.uniform1f(n.uniforms.uSharpen, this.sharpen);
     gl.bindTexture(gl.TEXTURE_2D, this.acc);
+
+    if (typeof target === "function") {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.outFbo);
+      gl.uniform1i(n.uniforms.uFlip, 1);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels.data);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      this.#checkErrors();
+      target(this.pixels.data, width, height, y);
+      return;
+    }
+
     if (target.width !== this.fullWidth || target.height !== this.fullHeight) {
       target.width = this.fullWidth;
       target.height = this.fullHeight;
@@ -253,8 +286,10 @@ export class Stitcher {
     if (error !== gl.NO_ERROR) throw new Error(`Stitching failed (WebGL error ${error}).`);
   }
 
-  #ensureSize(width, height) {
-    if (this.width === width && this.height === height) return;
+  // Makes the buffers for a width × height pass. With readBack, results are always read back as
+  // pixels, so the hidden canvas isn't needed at that size.
+  #ensureSize(width, height, readBack = false) {
+    if (this.width === width && this.height === height && this.readBackSized === readBack) return;
     const gl = this.gl;
     const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const maxViewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0];
@@ -263,9 +298,13 @@ export class Stitcher {
     }
     this.#freeBuffers();
     [this.acc, this.accFbo] = renderTarget(gl, gl.RGBA16F, width, height);
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.canvasFits = gl.drawingBufferWidth === width && gl.drawingBufferHeight === height;
+    if (readBack) {
+      this.canvasFits = false;
+    } else {
+      this.canvas.width = width;
+      this.canvas.height = height;
+      this.canvasFits = gl.drawingBufferWidth === width && gl.drawingBufferHeight === height;
+    }
     if (!this.canvasFits) {
       this.canvas.width = this.canvas.height = 1; // free it; not used
       // Made here, not while drawing: creating a texture changes what's bound, and binding it
@@ -275,6 +314,7 @@ export class Stitcher {
     }
     this.width = width;
     this.height = height;
+    this.readBackSized = readBack;
   }
 
   #freeBuffers() {
@@ -316,9 +356,45 @@ function renderTarget(gl, format, width, height) {
   return [texture, fbo];
 }
 
-// How far (in pitch) a photo can reach from its center: half its diagonal field of view
-// (about 41° for the iPhone main camera) plus a margin.
-const PHOTO_REACH_DEG = 46;
+// Lowest and highest pitch (degrees) a photo covers: its border traced through its orientation,
+// extended to ±90° if it contains straight up or down. Used to skip photos that can't reach a strip.
+function pitchRange(meta, settings) {
+  const m = toMatrix3(multiply(photoOrientation(meta, settings), cameraOffset(settings)));
+  const tanHalf = Math.tan((settings.fovLongDeg * Math.PI) / 360);
+  const w = meta.width ?? 3;
+  const h = meta.height ?? 4;
+  const tx = (tanHalf * w) / Math.max(w, h); // half-width and half-height on the image plane
+  const ty = (tanHalf * h) / Math.max(w, h);
+  let min = 90;
+  let max = -90;
+  const add = (x, y) => {
+    // The camera looks along −Z, so a point (x, y) on its image plane is the ray (x, y, −1).
+    const wx = m[0] * x + m[1] * y - m[2];
+    const wy = m[3] * x + m[4] * y - m[5];
+    const wz = m[6] * x + m[7] * y - m[8];
+    const pitch = (Math.asin(wz / Math.hypot(wx, wy, wz)) * 180) / Math.PI;
+    min = Math.min(min, pitch);
+    max = Math.max(max, pitch);
+  };
+  for (let k = 0; k <= 8; k++) {
+    const t = -1 + k / 4;
+    add(t * tx, ty);
+    add(t * tx, -ty);
+    add(tx, t * ty);
+    add(-tx, t * ty);
+  }
+  for (const s of [1, -1]) {
+    // Straight up (s = 1) or down, in camera coordinates (the transpose of m).
+    const vx = m[6] * s;
+    const vy = m[7] * s;
+    const vz = m[8] * s;
+    if (vz < 0 && Math.abs(vx / -vz) <= tx && Math.abs(vy / -vz) <= ty) {
+      if (s > 0) max = 90;
+      else min = -90;
+    }
+  }
+  return { min: min - 1, max: max + 1 };
+}
 
 // Small fixed turn of the camera relative to the phone, the same for every photo.
 function cameraOffset(settings) {

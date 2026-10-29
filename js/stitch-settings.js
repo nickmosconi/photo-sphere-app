@@ -10,6 +10,7 @@ export const STITCH_DEFAULTS = {
   rollOffsetDeg: 0,
   feather: 0.5,
   sharpness: 15,
+  sharpen: 0.6, // light sharpening of the finished sphere (0 = off; 1.2+ looks gritty)
   matchExposure: true,
   outputWidth: 4096,
   useAligned: true,
@@ -17,11 +18,14 @@ export const STITCH_DEFAULTS = {
   tint: false,
 };
 
-// Sizes the phone tries for a finished sphere, largest first. 5792 × 2896 is the biggest image
-// iPhone Safari can draw on a canvas (about 16.7 million pixels); it is stitched in 2 strips,
-// because in one go it needed about 450 MB and Safari crashed. 4096 (in one go, about 250 MB)
-// is the fallback, and what the phone uses after a crash.
+// Sizes the phone tries for a finished sphere, largest first; after a crash it uses the next one.
+// - 8192 × 4096 is bigger than any canvas iPhone Safari allows (about 16.7 million pixels), so it
+//   is made in 4 strips that go straight into our own JPEG encoder ("streamed"), about 200 MB.
+// - 5792 × 2896 is the biggest canvas Safari allows; made in 2 strips (one go needed about 450 MB
+//   and Safari crashed).
+// - 4096 × 2048 in one go needs about 250 MB.
 export const SPHERE_SIZES = [
+  { width: 8192, strips: 4, streamed: true },
   { width: 5792, strips: 2 },
   { width: 4096, strips: 1 },
 ];

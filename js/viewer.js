@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { cameraDirection, fromDeviceOrientation, yawPitchFromDirection } from "./quat.js?v=0.6.1";
+import { cameraDirection, fromDeviceOrientation, yawPitchFromDirection } from "./quat.js?v=0.7.0";
 
 const DEG = Math.PI / 180;
 
@@ -19,8 +19,10 @@ export class PanoViewer {
     const geometry = new THREE.SphereGeometry(10, 128, 64);
     geometry.scale(-1, 1, 1); // look at the sphere from the inside
     this.material = new THREE.MeshBasicMaterial({ color: 0x444444 });
-    this.scene.add(new THREE.Mesh(geometry, this.material));
+    this.mesh = new THREE.Mesh(geometry, this.material);
+    this.scene.add(this.mesh);
     this.texture = null;
+    this.tiles = []; // meshes for a panorama shown as side-by-side tiles
 
     this.lon = 0; // degrees right of the image center
     this.lat = 0; // degrees above the horizon
@@ -37,14 +39,47 @@ export class PanoViewer {
 
   // Shows a new image. Call refresh() instead if the same canvas was just redrawn at the same size.
   setSource(source) {
+    this.clearTiles();
+    this.mesh.visible = true;
     this.texture?.dispose();
-    this.texture = new THREE.CanvasTexture(source);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this.texture = this.makeTexture(source);
     this.material.map = this.texture;
     this.material.color.set(0xffffff);
     this.material.needsUpdate = true;
     this.requestRender();
+  }
+
+  // Shows a panorama given as side-by-side vertical tiles (left to right), for spheres too big to
+  // be a single texture on a phone. Each tile covers its share of the sphere's longitude.
+  setTiles(sources) {
+    this.clearTiles();
+    this.mesh.visible = false;
+    const n = sources.length;
+    this.tiles = sources.map((source, k) => {
+      const geometry = new THREE.SphereGeometry(10, Math.ceil(128 / n), 64, (k * 2 * Math.PI) / n, (2 * Math.PI) / n);
+      geometry.scale(-1, 1, 1);
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: this.makeTexture(source) }));
+      this.scene.add(mesh);
+      return mesh;
+    });
+    this.requestRender();
+  }
+
+  clearTiles() {
+    for (const mesh of this.tiles) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.map.dispose();
+      mesh.material.dispose();
+    }
+    this.tiles = [];
+  }
+
+  makeTexture(source) {
+    const texture = new THREE.CanvasTexture(source);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    return texture;
   }
 
   refresh() {

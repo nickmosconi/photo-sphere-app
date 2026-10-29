@@ -34,6 +34,20 @@ export function freeImage(image) {
   else image.width = image.height = 0;
 }
 
+// JPEG of a decoded image (ImageBitmap or canvas).
+export async function imageToJpeg(image, quality) {
+  if (image.toBlob) return canvasToJpeg(image, quality);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+  canvas.getContext("2d").drawImage(image, 0, 0);
+  try {
+    return await canvasToJpeg(canvas, quality);
+  } finally {
+    canvas.width = canvas.height = 0;
+  }
+}
+
 export function canvasToJpeg(canvas, quality) {
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't make the JPEG."))), "image/jpeg", quality),

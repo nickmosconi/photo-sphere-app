@@ -1,11 +1,11 @@
-import { showVersion } from "./version.js?v=0.6.1";
-import { grayCopy, refineOrientations } from "./align.js?v=0.6.1";
-import { computeGains, smallCopy } from "./exposure.js?v=0.6.1";
-import { Stitcher } from "./stitcher.js?v=0.6.1";
-import { PanoViewer } from "./viewer.js?v=0.6.1";
-import { loadSessionZip } from "./session-file.js?v=0.6.1";
-import { makeSyntheticSession } from "./synthetic.js?v=0.6.1";
-import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.6.1";
+import { showVersion } from "./version.js?v=0.7.0";
+import { grayCopy, refineOrientations } from "./align.js?v=0.7.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.7.0";
+import { Stitcher } from "./stitcher.js?v=0.7.0";
+import { PanoViewer } from "./viewer.js?v=0.7.0";
+import { loadSessionZip } from "./session-file.js?v=0.7.0";
+import { makeSyntheticSession } from "./synthetic.js?v=0.7.0";
+import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.7.0";
 
 showVersion();
 
@@ -16,6 +16,7 @@ const SLIDERS = [
   { key: "rollOffsetDeg", label: "Roll offset", min: -10, max: 10, step: 0.05, unit: "°" },
   { key: "feather", label: "Edge fade", min: 0.02, max: 1, step: 0.01, unit: "" },
   { key: "sharpness", label: "Blend sharpness (0 = average)", min: 0, max: 60, step: 1, unit: "" },
+  { key: "sharpen", label: "Sharpening", min: 0, max: 1.5, step: 0.05, unit: "" },
 ];
 
 const SETTINGS_KEY = "sphere-cam-lab-settings";

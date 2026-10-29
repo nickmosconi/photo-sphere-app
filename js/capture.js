@@ -1,9 +1,9 @@
-import { showVersion, VERSION } from "./version.js?v=0.6.1";
-import * as db from "./db.js?v=0.6.1";
-import { buildSessionZip } from "./export.js?v=0.6.1";
-import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.6.1";
-import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.1";
-import { TARGETS } from "./targets.js?v=0.6.1";
+import { showVersion, VERSION } from "./version.js?v=0.7.0";
+import * as db from "./db.js?v=0.7.0";
+import { buildSessionZip } from "./export.js?v=0.7.0";
+import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.7.0";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.7.0";
+import { TARGETS } from "./targets.js?v=0.7.0";
 import {
   angleBetween,
   axisAngle,
@@ -16,7 +16,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.6.1";
+} from "./quat.js?v=0.7.0";
 
 showVersion();
 db.requestPersistentStorage();

@@ -1,6 +1,6 @@
-import { showVersion, VERSION } from "./version.js?v=0.6.1";
-import * as db from "./db.js?v=0.6.1";
-import { PanoViewer } from "./viewer.js?v=0.6.1";
+import { showVersion, VERSION } from "./version.js?v=0.7.0";
+import * as db from "./db.js?v=0.7.0";
+import { PanoViewer } from "./viewer.js?v=0.7.0";
 
 showVersion();
 
@@ -25,10 +25,20 @@ async function load() {
     document.querySelectorAll(".bottom-bar button").forEach((b) => (b.disabled = true));
     return;
   }
-  const img = new Image();
-  img.src = URL.createObjectURL(sphere.image);
-  await img.decode();
-  viewer.setSource(img);
+  // Big spheres come with left and right halves for viewing; the full image is for sharing.
+  const load = async (blob) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(blob);
+    await img.decode();
+    return img;
+  };
+  if (sphere.tiles?.length) {
+    const halves = [];
+    for (const tile of sphere.tiles) halves.push(await load(tile)); // one at a time, to spare memory
+    viewer.setTiles(halves);
+  } else {
+    viewer.setSource(await load(sphere.image));
+  }
 
   const when = new Date(sphere.capturedAt ?? sphere.createdAt);
   const p = (n) => String(n).padStart(2, "0");
