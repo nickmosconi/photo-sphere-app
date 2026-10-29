@@ -1,0 +1,11 @@
+node_modules/
+.venv/
+.next/
+dist/
+build/
+target/
+.env
+.env.*
+tmp/
+.DS_Store
+Thumbs.db
