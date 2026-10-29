@@ -141,6 +141,227 @@ body.capture video {
   max-width: 360px;
 }
 
+/* Guided capture */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.flash.on {
+  animation: flash 0.35s ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.capture-top {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.pill {
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  text-align: center;
+}
+
+.hint:empty {
+  display: none;
+}
+
+.camera-info {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.7);
+  font: 11px ui-monospace, Menlo, Consolas, monospace;
+  text-shadow: 0 0 3px #000;
+}
+
+.capture-bottom {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  z-index: 5;
+}
+
+.ctl {
+  flex: 1;
+  padding: 14px 0;
+  border: none;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ctl.primary {
+  background: var(--accent);
+}
+
+.ctl:disabled {
+  opacity: 0.4;
+}
+
+body.capture .version-badge {
+  top: calc(env(safe-area-inset-top) + 8px);
+  bottom: auto;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  background: var(--bg);
+  padding: calc(env(safe-area-inset-top) + 32px) 16px calc(env(safe-area-inset-bottom) + 32px);
+}
+
+.screen-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.screen h2 {
+  margin: 32px 0 8px;
+  font-size: 1.1rem;
+}
+
+.tip {
+  margin: 8px 0 24px;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.session-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.session-list li.empty {
+  color: var(--muted);
+  text-align: center;
+  border: none;
+}
+
+.session-title {
+  font-weight: 600;
+}
+
+.session-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 2px 0 8px;
+}
+
+.session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.small-button {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.text-button {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 1rem;
+  padding: 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.panel {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.panel-box {
+  width: 100%;
+  max-width: 400px;
+  padding: 24px 16px;
+  border-radius: 16px;
+  background: #1c232b;
+  text-align: center;
+}
+
+.panel-box h2 {
+  margin-top: 0;
+}
+
+.panel-box p {
+  overflow-wrap: anywhere;
+}
+
 .version-badge {
   position: fixed;
   right: 8px;

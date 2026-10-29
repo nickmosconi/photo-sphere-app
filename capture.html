@@ -4,20 +4,61 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sphere Cam · Capture</title>
-  <link rel="stylesheet" href="css/style.css?v=0.1.0">
+  <link rel="stylesheet" href="css/style.css?v=0.2.0">
 </head>
 <body class="capture">
   <video id="camera" playsinline muted autoplay></video>
-  <pre id="readout" class="readout"></pre>
-  <a href="./" class="back-link">← Home</a>
+  <canvas id="overlay" class="overlay"></canvas>
+  <div id="flash" class="flash"></div>
 
-  <section id="start-screen" class="start-screen">
-    <h1>Sensor check</h1>
-    <p>Turns on the rear camera and shows the phone's motion numbers.</p>
-    <button id="start-button" class="big-button" type="button">Start</button>
-    <p id="start-error" class="error"></p>
+  <div id="capture-ui" hidden>
+    <header class="capture-top">
+      <div id="progress" class="pill">0 / 30</div>
+      <div id="hint" class="hint"></div>
+      <div id="camera-info" class="camera-info"></div>
+    </header>
+    <footer class="capture-bottom">
+      <button id="cancel-button" class="ctl" type="button">Cancel</button>
+      <button id="undo-button" class="ctl" type="button">Undo</button>
+      <button id="done-button" class="ctl primary" type="button">Done</button>
+    </footer>
+  </div>
+
+  <section id="start-screen" class="screen">
+    <div class="screen-inner">
+      <h1>Capture</h1>
+      <p class="tip">
+        Stand in one spot and hold the phone upright. Turn the phone around its camera, not around
+        your body. Line up each dot with the ring and hold still; the photo takes itself.
+      </p>
+      <button id="new-button" class="big-button" type="button">New capture</button>
+      <p id="start-error" class="error"></p>
+      <h2>Saved captures</h2>
+      <ul id="session-list" class="session-list"></ul>
+      <p><a href="./">← Home</a></p>
+    </div>
   </section>
 
-  <script type="module" src="js/capture.js?v=0.1.0"></script>
+  <section id="finished-screen" class="screen" hidden>
+    <div class="screen-inner">
+      <h1>Capture saved</h1>
+      <p id="finished-summary"></p>
+      <button id="finished-export" class="big-button" type="button">Export .zip</button>
+      <p><button id="finished-back" class="text-button" type="button">Back to captures</button></p>
+      <p><a href="./">← Home</a></p>
+    </div>
+  </section>
+
+  <section id="export-panel" class="panel" hidden>
+    <div class="panel-box">
+      <h2>Export</h2>
+      <p id="export-status"></p>
+      <button id="share-button" class="big-button" type="button" hidden>Share…</button>
+      <p><a id="download-link" class="text-button" hidden>Download</a></p>
+      <p><button id="export-close" class="text-button" type="button">Close</button></p>
+    </div>
+  </section>
+
+  <script type="module" src="js/capture.js?v=0.2.0"></script>
 </body>
 </html>
