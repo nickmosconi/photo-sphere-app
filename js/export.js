@@ -1,6 +1,5 @@
-import { VERSION } from "./version.js?v=0.2.1";
-
-const JSZIP_URL = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
+import { loadJSZip } from "./jszip.js?v=0.3.0";
+import { VERSION } from "./version.js?v=0.3.0";
 
 // Describes the numbers in session.json, for the Stitch Lab and for anyone reading the file.
 const CONVENTIONS = {
@@ -16,7 +15,7 @@ const CONVENTIONS = {
 
 // Packs a session's photos and a session.json into a .zip File.
 export async function buildSessionZip(session, shots, onProgress) {
-  const { default: JSZip } = await import(JSZIP_URL);
+  const JSZip = await loadJSZip();
   const zip = new JSZip();
 
   const entries = shots.map((shot, i) => ({

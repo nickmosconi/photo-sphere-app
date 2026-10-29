@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sphere Cam · Stitch Lab</title>
+  <link rel="stylesheet" href="css/style.css?v=0.3.0">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+</head>
+<body class="lab">
+  <header class="lab-header">
+    <a href="./?v=0.3.0">← Home</a>
+    <h1>Stitch Lab</h1>
+  </header>
+
+  <div class="lab-layout">
+    <aside class="lab-controls">
+      <section>
+        <h2>Session</h2>
+        <label id="drop-zone" class="drop-zone">
+          <input id="file-input" type="file" accept=".zip,application/zip" hidden>
+          Drop a session .zip here, or click to choose one
+        </label>
+        <p>
+          <button id="synthetic-button" class="small-button" type="button">Make synthetic test session</button>
+        </p>
+        <label class="slider">
+          <span class="slider-head"><span>Synthetic sensor error</span><output id="noise-out"></output></span>
+          <input id="noise" type="range" min="0" max="5" step="0.1" value="0">
+        </label>
+        <p id="session-info" class="muted">No session loaded.</p>
+      </section>
+
+      <section>
+        <h2>Tuning</h2>
+        <div id="sliders"></div>
+        <label class="check"><input id="use-aligned" type="checkbox"> Use compass-aligned orientations</label>
+        <label class="check"><input id="tint" type="checkbox"> Tint each photo (shows where seams are)</label>
+        <label class="field">
+          Output size
+          <select id="output-width">
+            <option value="2048">2048 × 1024</option>
+            <option value="4096">4096 × 2048</option>
+            <option value="8192">8192 × 4096</option>
+          </select>
+        </label>
+        <p class="button-row">
+          <button id="reset-button" class="small-button" type="button">Reset</button>
+          <button id="copy-button" class="small-button" type="button">Copy settings</button>
+          <button id="download-button" class="small-button" type="button">Download JPEG</button>
+        </p>
+        <p id="stitch-info" class="muted"></p>
+      </section>
+    </aside>
+
+    <main class="lab-main">
+      <div id="viewer" class="viewer"></div>
+      <p class="muted">Drag to look around. Scroll or pinch to zoom.</p>
+      <div class="flat-wrap"><canvas id="flat-canvas"></canvas></div>
+    </main>
+  </div>
+
+  <script type="module" src="js/lab.js?v=0.3.0"></script>
+</body>
+</html>

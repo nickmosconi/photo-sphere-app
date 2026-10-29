@@ -362,6 +362,133 @@ body.capture .version-badge {
   overflow-wrap: anywhere;
 }
 
+/* Stitch Lab */
+
+body.lab {
+  padding: 0 16px 48px;
+}
+
+.lab-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: calc(env(safe-area-inset-top) + 12px) 0 12px;
+}
+
+.lab-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.lab-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .lab-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.lab-controls h2 {
+  font-size: 1rem;
+  margin: 8px 0 12px;
+}
+
+.lab-controls section + section {
+  margin-top: 24px;
+}
+
+.lab-main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: pre-line;
+}
+
+.drop-zone {
+  display: block;
+  padding: 20px 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop-zone.over {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.slider {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.slider-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.slider output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider input {
+  width: 100%;
+}
+
+.check,
+.field {
+  display: block;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.field select {
+  margin-left: 8px;
+  font: inherit;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.viewer {
+  height: min(60vh, 560px);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.viewer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.flat-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: #000;
+}
+
 .version-badge {
   position: fixed;
   right: 8px;
