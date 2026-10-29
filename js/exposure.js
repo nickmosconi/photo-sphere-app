@@ -1,4 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.4.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.5.0";
+import { photoOrientation } from "./stitch-settings.js?v=0.5.0";
 
 // Brightness matching. The iPhone adjusts exposure and white balance for every photo, and
 // each photo is darker toward its edges (lens vignetting), so neighboring photos differ in
@@ -26,7 +27,7 @@ export function smallCopy(image) {
   return { data, width: canvas.width, height: canvas.height };
 }
 
-// photos: [{ small, quaternion, quaternionAligned }]; settings: the stitch settings.
+// photos: [{ small, quaternion, quaternionAligned?, quaternionRefined? }]; settings: the stitch settings.
 // Returns { gains: one [r, g, b] per photo, vignette: [r, g, b] }.
 export function computeGains(photos, settings) {
   const n = photos.length;
@@ -36,7 +37,7 @@ export function computeGains(photos, settings) {
   );
   const tanHalf = Math.tan((settings.fovLongDeg * Math.PI) / 360);
   const cams = photos.map((p) => ({
-    m: toMatrix3(multiply(settings.useAligned ? p.quaternionAligned ?? p.quaternion : p.quaternion, offset)),
+    m: toMatrix3(multiply(photoOrientation(p, settings), offset)),
     f: Math.max(p.small.width, p.small.height) / 2 / tanHalf,
     ...p.small,
   }));

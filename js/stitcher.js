@@ -1,4 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.4.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.5.0";
+import { photoOrientation } from "./stitch-settings.js?v=0.5.0";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -91,7 +92,7 @@ export class Stitcher {
     this.pixels = null;
   }
 
-  // photos: [{ image, quaternion, quaternionAligned?, gain? }]. Images are copied to the GPU,
+  // photos: [{ image, quaternion, quaternionAligned?, quaternionRefined?, gain? }]. Images are copied to the GPU,
   // so the caller can free them afterwards.
   setPhotos(photos) {
     this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
@@ -101,7 +102,7 @@ export class Stitcher {
   // Stitches the photos given to setPhotos and draws the panorama into `target`
   // (a 2D canvas, resized to fit). Fast enough to re-run on every slider move.
   // settings: { outputWidth, fovLongDeg, yawOffsetDeg, pitchOffsetDeg, rollOffsetDeg,
-  //             feather, sharpness, matchExposure, vignette, useAligned, tint, yaw0Deg }
+  //             feather, sharpness, matchExposure, vignette, useAligned, refine, tint, yaw0Deg }
   stitch(settings, target) {
     this.#begin(settings);
     this.photos.forEach((photo, i) => this.#drawPhoto(photo, i, this.photos.length, settings));
@@ -109,7 +110,7 @@ export class Stitcher {
   }
 
   // Same result, but with only one photo on the GPU at a time, to save memory on phones.
-  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned?, gain? }; each image is freed
+  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned?, quaternionRefined?, gain? }; each image is freed
   // (see freeImage) once it has been copied to the GPU.
   async stitchOneByOne(settings, target, count, loadPhoto, freeImage) {
     this.#begin(settings);
@@ -138,7 +139,8 @@ export class Stitcher {
       width: p.image.width,
       height: p.image.height,
       quaternion: p.quaternion,
-      quaternionAligned: p.quaternionAligned ?? p.quaternion,
+      quaternionAligned: p.quaternionAligned,
+      quaternionRefined: p.quaternionRefined,
       gain: p.gain ?? [1, 1, 1],
     };
   }
@@ -160,7 +162,7 @@ export class Stitcher {
       axisAngle([0, 0, 1], settings.rollOffsetDeg),
     );
     const tanHalf = Math.tan((settings.fovLongDeg * Math.PI) / 360);
-    const q = multiply(settings.useAligned ? photo.quaternionAligned : photo.quaternion, offset);
+    const q = multiply(photoOrientation(photo, settings), offset);
 
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);

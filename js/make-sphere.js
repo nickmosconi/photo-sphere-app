@@ -1,9 +1,10 @@
-import * as db from "./db.js?v=0.4.1";
-import { computeGains, SMALL_SIZE, smallCopy } from "./exposure.js?v=0.4.1";
-import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.4.1";
-import { MAX_PHOTO_SIZE, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.4.1";
-import { Stitcher } from "./stitcher.js?v=0.4.1";
-import { addGPanoXmp } from "./xmp.js?v=0.4.1";
+import { ALIGN_SIZE, grayCopy, refineOrientations } from "./align.js?v=0.5.0";
+import * as db from "./db.js?v=0.5.0";
+import { computeGains, SMALL_SIZE, smallCopy } from "./exposure.js?v=0.5.0";
+import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.5.0";
+import { MAX_PHOTO_SIZE, photoOrientation, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.5.0";
+import { Stitcher } from "./stitcher.js?v=0.5.0";
+import { addGPanoXmp } from "./xmp.js?v=0.5.0";
 
 const JPEG_QUALITY = 0.92;
 const THUMB_WIDTH = 640;
@@ -18,12 +19,24 @@ export async function makeSphere(sessionId, onProgress) {
   const n = shots.length;
   const settings = { ...STITCH_DEFAULTS, yaw0Deg: session.yaw0Deg ?? 0 };
 
-  // First pass: small copies of every photo, to work out brightness matching.
+  // First pass: smaller copies of every photo, for lining them up and matching brightness.
   for (const [i, shot] of shots.entries()) {
-    onProgress?.(i / (2 * n), `Matching brightness… ${i + 1} of ${n}`);
-    const image = await decodeImage(shot.blob, SMALL_SIZE);
+    onProgress?.((0.4 * i) / n, `Reading photo ${i + 1} of ${n}…`);
+    const image = await decodeImage(shot.blob, settings.refine ? ALIGN_SIZE : SMALL_SIZE);
+    if (settings.refine) shot.gray = grayCopy(image);
     shot.small = smallCopy(image);
     freeImage(image);
+  }
+  if (settings.refine) {
+    const start = shots.map((shot) => ({ gray: shot.gray, quaternion: photoOrientation(shot, { ...settings, refine: false }) }));
+    const aligned = await refineOrientations(start, settings, (round, rounds) =>
+      onProgress?.(0.4 + (0.1 * round) / rounds, "Lining up photos…"),
+    );
+    shots.forEach((shot, i) => {
+      shot.quaternionRefined = aligned.quaternions[i];
+      shot.gray = null;
+    });
+    settings.alignment = { matches: aligned.matches, beforeDeg: aligned.beforeDeg, afterDeg: aligned.afterDeg };
   }
   if (settings.matchExposure) {
     const { gains, vignette } = computeGains(shots, settings);
@@ -40,12 +53,13 @@ export async function makeSphere(sessionId, onProgress) {
       canvas,
       n,
       async (i) => {
-        onProgress?.((n + i) / (2 * n), `Adding photo ${i + 1} of ${n}…`);
+        onProgress?.(0.5 + (0.5 * i) / n, `Adding photo ${i + 1} of ${n}…`);
         const shot = shots[i];
         return {
           image: await decodeImage(shot.blob, MAX_PHOTO_SIZE),
           quaternion: shot.quaternion,
           quaternionAligned: shot.quaternionAligned,
+          quaternionRefined: shot.quaternionRefined,
           gain: shot.gain,
         };
       },

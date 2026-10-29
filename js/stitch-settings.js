@@ -13,8 +13,16 @@ export const STITCH_DEFAULTS = {
   matchExposure: true,
   outputWidth: 4096,
   useAligned: true,
+  refine: true, // line photos up using their content (align.js)
   tint: false,
 };
 
 // Photos are scaled down to this size (long side) before stitching; plenty for a 4096-wide panorama.
 export const MAX_PHOTO_SIZE = 2048;
+
+// The orientation to use for a photo: refined by alignment if available and wanted,
+// otherwise as recorded (compass-aligned or raw).
+export function photoOrientation(photo, settings) {
+  if (settings.refine && photo.quaternionRefined) return photo.quaternionRefined;
+  return settings.useAligned ? photo.quaternionAligned ?? photo.quaternion : photo.quaternion;
+}

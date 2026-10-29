@@ -1,10 +1,11 @@
-import { showVersion } from "./version.js?v=0.4.1";
-import { computeGains, smallCopy } from "./exposure.js?v=0.4.1";
-import { Stitcher } from "./stitcher.js?v=0.4.1";
-import { PanoViewer } from "./viewer.js?v=0.4.1";
-import { loadSessionZip } from "./session-file.js?v=0.4.1";
-import { makeSyntheticSession } from "./synthetic.js?v=0.4.1";
-import { MAX_PHOTO_SIZE, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.4.1";
+import { showVersion } from "./version.js?v=0.5.0";
+import { grayCopy, refineOrientations } from "./align.js?v=0.5.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.5.0";
+import { Stitcher } from "./stitcher.js?v=0.5.0";
+import { PanoViewer } from "./viewer.js?v=0.5.0";
+import { loadSessionZip } from "./session-file.js?v=0.5.0";
+import { makeSyntheticSession } from "./synthetic.js?v=0.5.0";
+import { MAX_PHOTO_SIZE, photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.5.0";
 
 showVersion();
 
@@ -57,6 +58,10 @@ $("use-aligned").addEventListener("change", (e) => {
   settings.useAligned = e.target.checked;
   changed();
 });
+$("refine").addEventListener("change", (e) => {
+  settings.refine = e.target.checked;
+  changed();
+});
 $("match-exposure").addEventListener("change", (e) => {
   settings.matchExposure = e.target.checked;
   changed();
@@ -95,6 +100,7 @@ function showSettings() {
     output.textContent = `${Number(settings[s.key]).toFixed(s.step < 0.1 ? 2 : 1)}${s.unit}`;
   }
   $("use-aligned").checked = settings.useAligned;
+  $("refine").checked = settings.refine;
   $("match-exposure").checked = settings.matchExposure;
   $("tint").checked = settings.tint;
   $("output-width").value = String(settings.outputWidth);
@@ -168,7 +174,7 @@ async function openZip(file) {
   setInfo(`Opening ${file.name}…`);
   try {
     const data = await loadSessionZip(file, MAX_PHOTO_SIZE, (i, n) => setInfo(`Loading photos… ${i + 1} / ${n}`));
-    useSession(data);
+    await useSession(data);
   } catch (err) {
     console.error(err);
     setInfo(`Couldn't open that file: ${err.message}`);
@@ -181,14 +187,26 @@ async function loadSynthetic() {
     noiseDeg: Number(noise.value),
     onProgress: (i, n) => setInfo(`Making test photos… ${i + 1} / ${n}`),
   });
-  useSession(data);
+  await useSession(data);
 }
 
-function useSession(data) {
+async function useSession(data) {
   if (!stitcher) return;
-  // Brightness matching works on small copies, so make them before the full images are freed.
-  for (const shot of data.shots) shot.small = smallCopy(shot.image);
-  const { gains, vignette } = computeGains(data.shots, settings);
+  // Alignment and brightness matching work on smaller copies, so make them before the full
+  // images are freed.
+  for (const shot of data.shots) {
+    shot.gray = grayCopy(shot.image);
+    shot.small = smallCopy(shot.image);
+  }
+  const start = data.shots.map((shot) => ({ gray: shot.gray, quaternion: photoOrientation(shot, { ...settings, refine: false }) }));
+  const aligned = await refineOrientations(start, settings, (round, rounds) =>
+    setInfo(`Lining up photos… round ${round + 1} of ${rounds}`),
+  );
+  data.shots.forEach((shot, i) => {
+    shot.quaternionRefined = aligned.quaternions[i];
+    shot.gray = null;
+  });
+  const { gains, vignette } = computeGains(data.shots, { ...settings, refine: true });
   data.shots.forEach((shot, i) => (shot.gain = gains[i]));
   data.vignette = vignette;
   stitcher.setPhotos(data.shots);
@@ -198,9 +216,13 @@ function useSession(data) {
   const s = data.session;
   const when = new Date(s.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   const segments = s.segments?.length ?? 1;
+  const alignInfo =
+    aligned.beforeDeg == null
+      ? "Lining up: no matches found"
+      : `Lining up: ${aligned.matches} matches, off by ${aligned.beforeDeg.toFixed(2)}° → ${aligned.afterDeg.toFixed(2)}°`;
   setInfo(
     `${data.name}\n${data.shots.length} photos · ${s.video.width}×${s.video.height} · ${s.cameraLabel}\n` +
-      `${when}${segments > 1 ? ` · ${segments} segments (paused ${segments - 1}×)` : ""}`,
+      `${when}${segments > 1 ? ` · ${segments} segments (paused ${segments - 1}×)` : ""}\n${alignInfo}`,
   );
   requestStitch();
 }
