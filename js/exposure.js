@@ -1,5 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.0";
-import { photoOrientation } from "./stitch-settings.js?v=0.6.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.1";
+import { photoOrientation } from "./stitch-settings.js?v=0.6.1";
 
 // Brightness matching. The iPhone adjusts exposure and white balance for every photo, and
 // each photo is darker toward its edges (lens vignetting), so neighboring photos differ in

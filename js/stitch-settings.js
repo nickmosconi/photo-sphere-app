@@ -18,13 +18,17 @@ export const STITCH_DEFAULTS = {
 };
 
 // Sizes the phone tries for a finished sphere, largest first. 5792 × 2896 is the biggest image
-// iPhone Safari can draw on a canvas (about 16.7 million pixels); 4096 is the fallback if the
-// phone runs out of memory.
-export const SPHERE_WIDTHS = [5792, 4096];
+// iPhone Safari can draw on a canvas (about 16.7 million pixels); it is stitched in 2 strips,
+// because in one go it needed about 450 MB and Safari crashed. 4096 (in one go, about 250 MB)
+// is the fallback, and what the phone uses after a crash.
+export const SPHERE_SIZES = [
+  { width: 5792, strips: 2 },
+  { width: 4096, strips: 1 },
+];
 
-// The phone scales photos to this size (long side) before stitching: 45 pixels per degree,
-// more than the 16 a 5792-wide sphere can hold, so the sphere gets all the detail it can use.
-export const MAX_PHOTO_SIZE = 3072;
+// The phone scales photos to this size (long side) before stitching: 30 pixels per degree,
+// more than the 16 a 5792-wide sphere can hold.
+export const MAX_PHOTO_SIZE = 2048;
 
 // The orientation to use for a photo: refined by alignment if available and wanted,
 // otherwise as recorded (compass-aligned or raw).

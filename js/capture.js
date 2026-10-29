@@ -1,9 +1,9 @@
-import { showVersion, VERSION } from "./version.js?v=0.6.0";
-import * as db from "./db.js?v=0.6.0";
-import { buildSessionZip } from "./export.js?v=0.6.0";
-import { makeSphere } from "./make-sphere.js?v=0.6.0";
-import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.0";
-import { TARGETS } from "./targets.js?v=0.6.0";
+import { showVersion, VERSION } from "./version.js?v=0.6.1";
+import * as db from "./db.js?v=0.6.1";
+import { buildSessionZip } from "./export.js?v=0.6.1";
+import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.6.1";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.1";
+import { TARGETS } from "./targets.js?v=0.6.1";
 import {
   angleBetween,
   axisAngle,
@@ -16,7 +16,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.6.0";
+} from "./quat.js?v=0.6.1";
 
 showVersion();
 db.requestPersistentStorage();
@@ -79,7 +79,14 @@ $("done-button").addEventListener("click", finishCapture);
 $("export-close").addEventListener("click", closeExport);
 $("share-button").addEventListener("click", shareExport);
 
-showStartScreen();
+const crash = checkForCrash();
+showStartScreen(
+  crash
+    ? `Safari ran out of memory while making your last sphere (${crash.stage}). ` +
+        (crash.width ? "This phone will use a smaller sphere size from now on. " : "") +
+        "Your photos are safe: tap Make sphere to try again."
+    : "",
+);
 
 async function showStartScreen(message = "") {
   showScreen("start");
@@ -275,6 +282,7 @@ async function finishCapture() {
   await saveSession();
   stopCamera();
   releaseWakeLock();
+  frameCanvas.width = frameCanvas.height = 0; // free the 12-megapixel photo buffer before stitching
   buildSphere(session.id);
 }
 

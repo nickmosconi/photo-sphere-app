@@ -1,4 +1,4 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.1";
 
 // Refines each photo's orientation so overlapping photos line up (a "rotation bundle
 // adjustment"). The phone's sensors put each photo within a degree or two of where it
@@ -45,7 +45,7 @@ export function grayCopy(image) {
   g.imageSmoothingQuality = "high";
   g.drawImage(image, 0, 0, canvas.width, canvas.height);
   const { data } = g.getImageData(0, 0, canvas.width, canvas.height);
-  const gray = new Float32Array(canvas.width * canvas.height);
+  const gray = new Uint8ClampedArray(canvas.width * canvas.height); // 1 byte per pixel: 4× less than floats
   for (let i = 0; i < gray.length; i++) gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
   const { width, height } = canvas;
   canvas.width = canvas.height = 0; // free it now

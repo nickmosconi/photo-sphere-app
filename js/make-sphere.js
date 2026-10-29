@@ -1,106 +1,137 @@
-import { ALIGN_SIZE, grayCopy, refineOrientations } from "./align.js?v=0.6.0";
-import * as db from "./db.js?v=0.6.0";
-import { computeGains, SMALL_SIZE, smallCopy } from "./exposure.js?v=0.6.0";
-import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.6.0";
-import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_WIDTHS, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.0";
-import { Stitcher } from "./stitcher.js?v=0.6.0";
-import { addGPanoXmp } from "./xmp.js?v=0.6.0";
+import { ALIGN_SIZE, grayCopy, refineOrientations } from "./align.js?v=0.6.1";
+import * as db from "./db.js?v=0.6.1";
+import { computeGains, SMALL_SIZE, smallCopy } from "./exposure.js?v=0.6.1";
+import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.6.1";
+import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_SIZES, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.1";
+import { Stitcher } from "./stitcher.js?v=0.6.1";
+import { addGPanoXmp } from "./xmp.js?v=0.6.1";
 
 const JPEG_QUALITY = 0.92;
 const THUMB_WIDTH = 640;
 
+// If Safari runs out of memory it kills the page without warning, so nothing here can catch it.
+// Instead, what's being done is written down as it goes; if the page reloads with that note still
+// there, the last attempt crashed, and from then on this phone uses the next smaller size.
+const PROGRESS_KEY = "sphere-cam-making";
+const MAX_WIDTH_KEY = "sphere-cam-max-width";
+
+// Call when the page loads. Returns { stage, width } if the last sphere attempt crashed, else null.
+export function checkForCrash() {
+  const note = readStorage(PROGRESS_KEY);
+  if (!note) return null;
+  writeStorage(PROGRESS_KEY, null);
+  if (note.width) {
+    const smaller = SPHERE_SIZES.find((s) => s.width < note.width);
+    if (smaller) writeStorage(MAX_WIDTH_KEY, smaller.width);
+  }
+  return note;
+}
+
 // Stitches a saved capture session into a 360° JPEG and saves it as a sphere.
-// onProgress(fraction, message) reports how far along it is. widths: sizes to try, largest first.
-export async function makeSphere(sessionId, onProgress, widths = SPHERE_WIDTHS) {
+// onProgress(fraction, message) reports how far along it is.
+// sizes: [{ width, strips }] to try, largest first (normally SPHERE_SIZES, minus any that crashed).
+export async function makeSphere(sessionId, onProgress, sizes = sizesForThisPhone()) {
   const started = performance.now();
   const session = await db.getSession(sessionId);
   const shots = await db.getShots(sessionId);
   if (shots.length === 0) throw new Error("This capture has no photos.");
   const n = shots.length;
   const settings = { ...STITCH_DEFAULTS, yaw0Deg: session.yaw0Deg ?? 0 };
+  const note = (stage, width = null) => writeStorage(PROGRESS_KEY, { stage, width, sessionId });
 
-  // First pass: smaller copies of every photo, for lining them up and matching brightness.
-  for (const [i, shot] of shots.entries()) {
-    onProgress?.((0.4 * i) / n, `Reading photo ${i + 1} of ${n}…`);
-    const image = await decodeImage(shot.blob, settings.refine ? ALIGN_SIZE : SMALL_SIZE);
-    if (settings.refine) shot.gray = grayCopy(image);
-    shot.small = smallCopy(image);
-    freeImage(image);
-  }
-  if (settings.refine) {
-    const start = shots.map((shot) => ({ gray: shot.gray, quaternion: photoOrientation(shot, { ...settings, refine: false }) }));
-    const aligned = await refineOrientations(start, settings, (round, rounds) =>
-      onProgress?.(0.4 + (0.1 * round) / rounds, "Lining up photos…"),
-    );
-    shots.forEach((shot, i) => {
-      shot.quaternionRefined = aligned.quaternions[i];
-      shot.gray = null;
-    });
-    settings.alignment = { matches: aligned.matches, beforeDeg: aligned.beforeDeg, afterDeg: aligned.afterDeg };
-  }
-  if (settings.matchExposure) {
-    const { gains, vignette } = computeGains(shots, settings);
-    shots.forEach((shot, i) => (shot.gain = gains[i]));
-    settings.vignette = vignette;
-  }
-
-  // Second pass: stitch the full photos, one at a time, at the largest size the phone manages.
-  let result = null;
-  for (const [k, outputWidth] of widths.entries()) {
-    try {
-      result = await stitchAndEncode(shots, { ...settings, outputWidth }, (i) =>
-        onProgress?.(0.5 + (0.5 * i) / n, k === 0 ? `Adding photo ${i + 1} of ${n}…` : `Trying a smaller size… ${i + 1} of ${n}`),
-      );
-      break;
-    } catch (err) {
-      console.error(`Stitching at ${outputWidth} wide failed`, err);
-      if (k === widths.length - 1) throw err;
+  try {
+    // First pass: smaller copies of every photo, for lining them up and matching brightness.
+    for (const [i, shot] of shots.entries()) {
+      onProgress?.((0.4 * i) / n, `Reading photo ${i + 1} of ${n}…`);
+      note(`reading photo ${i + 1} of ${n}`);
+      const image = await decodeImage(shot.blob, settings.refine ? ALIGN_SIZE : SMALL_SIZE, shot);
+      if (settings.refine) shot.gray = grayCopy(image);
+      shot.small = smallCopy(image);
+      freeImage(image);
     }
-  }
-  const { width, height, jpeg, thumb } = result;
-  settings.outputWidth = width;
-  const headingDeg = poseHeading(session, shots);
-  const image = await addGPanoXmp(jpeg, { width, height, headingDeg });
+    if (settings.refine) {
+      note("lining up photos");
+      const start = shots.map((shot) => ({ gray: shot.gray, quaternion: photoOrientation(shot, { ...settings, refine: false }) }));
+      const aligned = await refineOrientations(start, settings, (round, rounds) =>
+        onProgress?.(0.4 + (0.1 * round) / rounds, "Lining up photos…"),
+      );
+      shots.forEach((shot, i) => {
+        shot.quaternionRefined = aligned.quaternions[i];
+        shot.gray = null;
+      });
+      settings.alignment = { matches: aligned.matches, beforeDeg: aligned.beforeDeg, afterDeg: aligned.afterDeg };
+    }
+    if (settings.matchExposure) {
+      const { gains, vignette } = computeGains(shots, settings);
+      shots.forEach((shot, i) => (shot.gain = gains[i]));
+      settings.vignette = vignette;
+    }
+    shots.forEach((shot) => (shot.small = null));
 
-  const sphere = {
-    id: crypto.randomUUID(),
-    sessionId,
-    createdAt: new Date().toISOString(),
-    capturedAt: session.createdAt,
-    width,
-    height,
-    headingDeg,
-    stitchSeconds: (performance.now() - started) / 1000,
-    settings,
-    image,
-    thumb,
-  };
-  await db.putSphere(sphere);
-  return sphere;
+    // Second pass: stitch the full photos, one at a time, at the largest size the phone manages.
+    let result = null;
+    for (const [k, size] of sizes.entries()) {
+      try {
+        result = await stitchAndEncode(shots, { ...settings, outputWidth: size.width }, size.strips, (i, strip) => {
+          const part = size.strips > 1 ? ` (part ${strip + 1} of ${size.strips})` : "";
+          onProgress?.(0.5 + (0.5 * (strip + i / n)) / size.strips, `${k === 0 ? "Adding" : "Trying a smaller size: adding"} photo ${i + 1} of ${n}${part}…`);
+          note(`stitching at ${size.width} wide${part}, photo ${i + 1} of ${n}`, size.width);
+        });
+        break;
+      } catch (err) {
+        console.error(`Stitching at ${size.width} wide failed`, err);
+        if (k === sizes.length - 1) throw err;
+      }
+    }
+    note("saving");
+    const { width, height, jpeg, thumb } = result;
+    settings.outputWidth = width;
+    const headingDeg = poseHeading(session, shots);
+    const image = await addGPanoXmp(jpeg, { width, height, headingDeg });
+
+    const sphere = {
+      id: crypto.randomUUID(),
+      sessionId,
+      createdAt: new Date().toISOString(),
+      capturedAt: session.createdAt,
+      width,
+      height,
+      headingDeg,
+      stitchSeconds: (performance.now() - started) / 1000,
+      settings,
+      image,
+      thumb,
+    };
+    await db.putSphere(sphere);
+    return sphere;
+  } finally {
+    writeStorage(PROGRESS_KEY, null); // finished or failed normally: not a crash
+  }
+}
+
+// Sphere sizes to try on this phone: all of them, unless a bigger one crashed before.
+function sizesForThisPhone() {
+  const maxWidth = readStorage(MAX_WIDTH_KEY);
+  const sizes = SPHERE_SIZES.filter((s) => !maxWidth || s.width <= maxWidth);
+  return sizes.length ? sizes : SPHERE_SIZES.slice(-1);
 }
 
 // Stitches the photos at settings.outputWidth and encodes the JPEG and a thumbnail.
 // Throws if the phone can't manage that size, so a smaller one can be tried.
-async function stitchAndEncode(shots, settings, onPhoto) {
+async function stitchAndEncode(shots, settings, strips, onPhoto) {
   const canvas = document.createElement("canvas");
   const stitcher = new Stitcher();
   try {
     await stitcher.stitchOneByOne(
       settings,
       canvas,
-      shots.length,
-      async (i) => {
-        onPhoto(i);
-        const shot = shots[i];
-        return {
-          image: await decodeImage(shot.blob, MAX_PHOTO_SIZE),
-          quaternion: shot.quaternion,
-          quaternionAligned: shot.quaternionAligned,
-          quaternionRefined: shot.quaternionRefined,
-          gain: shot.gain,
-        };
+      shots,
+      async (i, strip) => {
+        onPhoto(i, strip);
+        return decodeImage(shots[i].blob, MAX_PHOTO_SIZE, shots[i]);
       },
       freeImage,
+      strips,
     );
   } catch (err) {
     canvas.width = canvas.height = 0;
@@ -134,4 +165,21 @@ function poseHeading(session, shots) {
     heading = shots.find((s) => s.targetId === "h00")?.heading ?? null;
   }
   return heading == null ? null : ((heading % 360) + 360) % 360;
+}
+
+function readStorage(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "null");
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage blocked (e.g. private browsing): crash detection just won't work.
+  }
 }

@@ -109,3 +109,17 @@ Do steps 1–3 next, since together they address most of what looks "low quality
 | Reliability | The stitcher now stops with an error on graphics failures (lost context, WebGL errors, canvas too big) instead of producing a blank sphere. | 8192 blank-output bug would now be caught. |
 
 Still to check on the iPhone: Make sphere time and memory at 5792, what Sensor check lists under "adjustable", whether sharpest-frame capture slows the sweep, and Google Photos showing the result as 360°.
+
+### v0.6.1 (2026-10-28): iPhone crash fix
+
+On the iPhone, v0.6.0 crashed after capturing ("A problem repeatedly occurred"), meaning Safari killed the page for using too much memory. Making a 5792-wide sphere in one go needed roughly 400–450 MB; the 4096 version that worked in v0.4.0 needed about 250 MB.
+
+| Change | Memory effect |
+|---|---|
+| Big spheres are stitched in 2 horizontal strips; photos that can't reach a strip are skipped for it | Float buffer and drawing canvas halved (about 200 MB less); 52 photo reads instead of 30 |
+| Photos for stitching back to 2048 (from 3072); still 30 pixels per degree, about twice what a 5792 sphere holds | About 20 MB less per photo |
+| Capture's 12-megapixel photo buffer freed before stitching; alignment copies stored as bytes, not floats | About 48 MB + 44 MB less |
+| Photos decoded straight to the smaller size where Safari supports it | Avoids a 48 MB full-size copy per photo |
+| Crash recovery: progress is written down while making a sphere; if the page reloads with it still there, the app says which step crashed and uses 4096 from then on | Prevents repeated crashes |
+
+Tested on the PC: two strips match one pass (mean difference 0.001 out of 255); a 5792 sphere takes 30 s; a simulated crash showed the message and the next sphere was made at 4096. Still unverified: whether 5792 now fits in the iPhone's memory.

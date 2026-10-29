@@ -1,5 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.0";
-import { photoOrientation } from "./stitch-settings.js?v=0.6.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.1";
+import { photoOrientation } from "./stitch-settings.js?v=0.6.1";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -9,13 +9,17 @@ import { photoOrientation } from "./stitch-settings.js?v=0.6.0";
 // The result is drawn on a hidden WebGL canvas and copied into a 2D canvas. Browsers cap the size
 // of a WebGL canvas (8192 × 4096 fails in Chrome), so bigger results are drawn into a texture
 // and read back pixel by pixel instead, which is slower.
+// On phones a big sphere can be made in horizontal strips: the buffers then only need to be one
+// strip tall, which divides the biggest memory cost by the number of strips.
 
 const VERT = `#version 300 es
+uniform vec2 uUvOffset; // which part of the panorama this pass covers (a strip, or all of it)
+uniform vec2 uUvScale;
 out vec2 vUv;
 void main() {
   // One triangle that covers the whole screen.
   vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
-  vUv = p;
+  vUv = uUvOffset + p * uUvScale;
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
@@ -104,24 +108,37 @@ export class Stitcher {
   // settings: { outputWidth, fovLongDeg, yawOffsetDeg, pitchOffsetDeg, rollOffsetDeg,
   //             feather, sharpness, matchExposure, vignette, useAligned, refine, tint, yaw0Deg }
   stitch(settings, target) {
-    this.#begin(settings);
+    this.#begin(settings, 0, 1);
     this.photos.forEach((photo, i) => this.#drawPhoto(photo, i, this.photos.length, settings));
-    this.#finish(target);
+    this.#finish(target, 0);
   }
 
-  // Same result, but with only one photo on the GPU at a time, to save memory on phones.
-  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned?, quaternionRefined?, gain? }; each image is freed
-  // (see freeImage) once it has been copied to the GPU.
-  async stitchOneByOne(settings, target, count, loadPhoto, freeImage) {
-    this.#begin(settings);
-    for (let i = 0; i < count; i++) {
-      const p = await loadPhoto(i);
-      const photo = this.#upload(p);
-      freeImage?.(p.image);
-      this.#drawPhoto(photo, i, count, settings);
-      this.gl.deleteTexture(photo.texture);
+  // Same result, but with only one photo on the GPU at a time and the panorama made in `strips`
+  // horizontal strips, to save memory on phones. photos: [{ quaternion, quaternionAligned?,
+  // quaternionRefined?, gain? }] without images; loadImage(i, strip) resolves to photo i's image,
+  // which is freed (see freeImage) once it is on the GPU. Photos that can't reach a strip are
+  // skipped for it, so with 2 strips only the horizon photos are read twice.
+  async stitchOneByOne(settings, target, photos, loadImage, freeImage, strips = 1) {
+    const offset = cameraOffset(settings);
+    for (let strip = 0; strip < strips; strip++) {
+      this.#begin(settings, strip, strips);
+      // Pitch range of this strip (strip 0 is at the top).
+      const top = 90 - (180 * strip) / strips;
+      const bottom = 90 - (180 * (strip + 1)) / strips;
+      for (const [i, meta] of photos.entries()) {
+        if (strips > 1) {
+          const m = toMatrix3(multiply(photoOrientation(meta, settings), offset));
+          const pitch = (Math.asin(Math.max(-1, Math.min(1, -m[8]))) * 180) / Math.PI;
+          if (pitch - PHOTO_REACH_DEG >= top || pitch + PHOTO_REACH_DEG <= bottom) continue;
+        }
+        const image = await loadImage(i, strip);
+        const photo = this.#upload({ ...meta, image });
+        freeImage?.(image);
+        this.#drawPhoto(photo, i, photos.length, settings);
+        this.gl.deleteTexture(photo.texture);
+      }
+      this.#finish(target, (strip * this.fullHeight) / strips);
     }
-    this.#finish(target);
   }
 
   #upload(p) {
@@ -145,9 +162,15 @@ export class Stitcher {
     };
   }
 
-  #begin(settings) {
+  // Starts a pass over one strip (of `strips`) of the panorama.
+  #begin(settings, strip, strips) {
     const gl = this.gl;
-    this.#ensureSize(settings.outputWidth, settings.outputWidth / 2);
+    this.fullWidth = settings.outputWidth;
+    this.fullHeight = settings.outputWidth / 2;
+    this.#ensureSize(this.fullWidth, this.fullHeight / strips);
+    // vUv.y runs from 0 at the bottom to 1 at the top; strip 0 is the top one.
+    this.uvOffset = [0, (strips - 1 - strip) / strips];
+    this.uvScale = [1, 1 / strips];
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -156,13 +179,8 @@ export class Stitcher {
   // Adds one photo's color × weight and weight into the float buffer.
   #drawPhoto(photo, i, count, settings) {
     const gl = this.gl;
-    // Small fixed turn of the camera relative to the phone, the same for every photo.
-    const offset = multiply(
-      multiply(axisAngle([0, 1, 0], settings.yawOffsetDeg), axisAngle([1, 0, 0], settings.pitchOffsetDeg)),
-      axisAngle([0, 0, 1], settings.rollOffsetDeg),
-    );
     const tanHalf = Math.tan((settings.fovLongDeg * Math.PI) / 360);
-    const q = multiply(photoOrientation(photo, settings), offset);
+    const q = multiply(photoOrientation(photo, settings), cameraOffset(settings));
 
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);
@@ -172,6 +190,8 @@ export class Stitcher {
     const p = this.photoProgram;
     gl.useProgram(p.program);
     gl.uniform1i(p.uniforms.uPhoto, 0);
+    gl.uniform2fv(p.uniforms.uUvOffset, this.uvOffset);
+    gl.uniform2fv(p.uniforms.uUvScale, this.uvScale);
     gl.uniform1f(p.uniforms.uYaw0, ((settings.yaw0Deg ?? 0) * Math.PI) / 180);
     gl.uniform1f(p.uniforms.uFeather, settings.feather);
     gl.uniform1f(p.uniforms.uSharpness, settings.sharpness ?? 0);
@@ -188,8 +208,9 @@ export class Stitcher {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  // Divides out the weights and copies the result into the target canvas.
-  #finish(target) {
+  // Divides out the weights and copies the result (the whole panorama, or one strip of it,
+  // placed at row y) into the target canvas.
+  #finish(target, y) {
     const gl = this.gl;
     const { width, height } = this;
     gl.bindVertexArray(this.vao);
@@ -199,19 +220,19 @@ export class Stitcher {
     gl.useProgram(n.program);
     gl.uniform1i(n.uniforms.uAcc, 0);
     gl.bindTexture(gl.TEXTURE_2D, this.acc);
-    if (target.width !== width || target.height !== height) {
-      target.width = width;
-      target.height = height;
+    if (target.width !== this.fullWidth || target.height !== this.fullHeight) {
+      target.width = this.fullWidth;
+      target.height = this.fullHeight;
     }
     const ctx = target.getContext("2d");
-    if (!ctx) throw new Error(`This device can't hold a ${width}×${height} image.`);
+    if (!ctx) throw new Error(`This device can't hold a ${this.fullWidth}×${this.fullHeight} image.`);
 
     if (this.canvasFits) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.uniform1i(n.uniforms.uFlip, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       this.#checkErrors();
-      ctx.drawImage(this.canvas, 0, 0);
+      ctx.drawImage(this.canvas, 0, y);
       return;
     }
 
@@ -221,7 +242,7 @@ export class Stitcher {
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels.data);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     this.#checkErrors();
-    ctx.putImageData(this.pixels, 0, 0);
+    ctx.putImageData(this.pixels, 0, y);
   }
 
   // Fails loudly instead of handing back a blank image (phones can run out of graphics memory).
@@ -293,6 +314,18 @@ function renderTarget(gl, format, width, height) {
     throw new Error(`Couldn't set up a ${width}×${height} stitching buffer. Try a smaller output size.`);
   }
   return [texture, fbo];
+}
+
+// How far (in pitch) a photo can reach from its center: half its diagonal field of view
+// (about 41° for the iPhone main camera) plus a margin.
+const PHOTO_REACH_DEG = 46;
+
+// Small fixed turn of the camera relative to the phone, the same for every photo.
+function cameraOffset(settings) {
+  return multiply(
+    multiply(axisAngle([0, 1, 0], settings.yawOffsetDeg), axisAngle([1, 0, 0], settings.pitchOffsetDeg)),
+    axisAngle([0, 0, 1], settings.rollOffsetDeg),
+  );
 }
 
 // A different bright color for each photo.
