@@ -1,21 +1,28 @@
-// Saves capture sessions and their photos in the browser's IndexedDB,
+// Saves capture sessions, their photos and finished spheres in the browser's IndexedDB,
 // so nothing is lost if Safari reloads the page.
 
 const DB_NAME = "sphere-cam";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // 1: sessions + shots; 2: spheres
 
 let dbPromise = null;
 
 function openDb() {
   dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (e) => {
       const db = req.result;
-      db.createObjectStore("sessions", { keyPath: "id" });
-      const shots = db.createObjectStore("shots", { keyPath: "id", autoIncrement: true });
-      shots.createIndex("sessionId", "sessionId");
+      if (e.oldVersion < 1) {
+        db.createObjectStore("sessions", { keyPath: "id" });
+        const shots = db.createObjectStore("shots", { keyPath: "id", autoIncrement: true });
+        shots.createIndex("sessionId", "sessionId");
+      }
+      if (e.oldVersion < 2) db.createObjectStore("spheres", { keyPath: "id" });
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // Let a newer version of the app (in another tab) upgrade the database.
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   });
   return dbPromise;
@@ -70,6 +77,25 @@ export async function getShots(sessionId) {
     tx.objectStore("shots").index("sessionId").getAll(sessionId),
   );
   return shots.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// Finished spheres: { id, sessionId, createdAt, capturedAt, width, height, headingDeg, stitchSeconds,
+// settings, image (JPEG blob with 360° metadata), thumb (small JPEG blob) }.
+export function putSphere(sphere) {
+  return run("spheres", "readwrite", (tx) => tx.objectStore("spheres").put(sphere));
+}
+
+export function getSphere(id) {
+  return run("spheres", "readonly", (tx) => tx.objectStore("spheres").get(id));
+}
+
+export async function listSpheres() {
+  const spheres = await run("spheres", "readonly", (tx) => tx.objectStore("spheres").getAll());
+  return spheres.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function deleteSphere(id) {
+  return run("spheres", "readwrite", (tx) => tx.objectStore("spheres").delete(id));
 }
 
 // Asks the browser not to clear our storage when the phone is low on space (best effort).

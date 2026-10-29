@@ -1,4 +1,5 @@
-import { loadJSZip } from "./jszip.js?v=0.3.1";
+import { decodeImage } from "./images.js?v=0.4.0";
+import { loadJSZip } from "./jszip.js?v=0.4.0";
 
 // Opens a session .zip exported by the capture page. Photos larger than maxSize on their
 // long side are scaled down, which is plenty for the panorama and saves memory.
@@ -18,18 +19,4 @@ export async function loadSessionZip(file, maxSize, onProgress) {
     shots.push({ ...shot, image: await decodeImage(blob, maxSize) });
   }
   return { name: file.name, session: json.session, shots };
-}
-
-async function decodeImage(blob, maxSize) {
-  const bitmap = await createImageBitmap(blob);
-  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
-  if (scale === 1) return bitmap;
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const g = canvas.getContext("2d");
-  g.imageSmoothingQuality = "high";
-  g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas;
 }

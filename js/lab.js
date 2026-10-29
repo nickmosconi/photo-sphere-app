@@ -1,24 +1,11 @@
-import { showVersion } from "./version.js?v=0.3.1";
-import { Stitcher } from "./stitcher.js?v=0.3.1";
-import { PanoViewer } from "./viewer.js?v=0.3.1";
-import { loadSessionZip } from "./session-file.js?v=0.3.1";
-import { makeSyntheticSession } from "./synthetic.js?v=0.3.1";
+import { showVersion } from "./version.js?v=0.4.0";
+import { Stitcher } from "./stitcher.js?v=0.4.0";
+import { PanoViewer } from "./viewer.js?v=0.4.0";
+import { loadSessionZip } from "./session-file.js?v=0.4.0";
+import { makeSyntheticSession } from "./synthetic.js?v=0.4.0";
+import { MAX_PHOTO_SIZE, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.4.0";
 
 showVersion();
-
-// Starting values. When good values are found, paste the "Copy settings" output here.
-// 68° fits the first real iPhone session best (overlap agreement was lowest at 67–68°);
-// the offsets showed no clear preference, so they stay at 0.
-const DEFAULTS = {
-  fovLongDeg: 68,
-  yawOffsetDeg: 0,
-  pitchOffsetDeg: 0,
-  rollOffsetDeg: 0,
-  feather: 0.5,
-  outputWidth: 4096,
-  useAligned: true,
-  tint: false,
-};
 
 const SLIDERS = [
   { key: "fovLongDeg", label: "Field of view (long side)", min: 40, max: 100, step: 0.1, unit: "°" },
@@ -29,7 +16,6 @@ const SLIDERS = [
 ];
 
 const SETTINGS_KEY = "sphere-cam-lab-settings";
-const MAX_PHOTO_SIZE = 2048;
 
 const $ = (id) => document.getElementById(id);
 const flatCanvas = $("flat-canvas"); // the stitcher draws here; the 360° view reads from it too

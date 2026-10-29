@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sphere Cam · View</title>
+  <link rel="stylesheet" href="css/style.css?v=0.4.0">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+</head>
+<body class="view">
+  <div id="viewer" class="viewer-full"></div>
+
+  <header class="view-top">
+    <a class="ctl back" href="./?v=0.4.0">← Home</a>
+    <div id="view-info" class="hint"></div>
+  </header>
+
+  <footer class="bottom-bar">
+    <button id="gyro-button" class="ctl" type="button">Move phone</button>
+    <button id="share-button" class="ctl primary" type="button">Save / Share</button>
+    <button id="delete-button" class="ctl" type="button">Delete</button>
+  </footer>
+
+  <script type="module" src="js/view.js?v=0.4.0"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
     {
       "name": "sphere-cam",
       "runtimeExecutable": "npx.cmd",
-      "runtimeArgs": ["-y", "serve", "-l", "5173", "."],
+      "runtimeArgs": ["-y", "serve", "-l", "5173", "--config", ".claude/serve.json", "."],
       "port": 5173
     }
   ]

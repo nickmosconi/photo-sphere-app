@@ -219,7 +219,8 @@ body.capture video {
   text-shadow: 0 0 3px #000;
 }
 
-.capture-bottom {
+.capture-bottom,
+.bottom-bar {
   position: fixed;
   left: 8px;
   right: 8px;
@@ -360,6 +361,82 @@ body.capture .version-badge {
 
 .panel-box p {
   overflow-wrap: anywhere;
+}
+
+.progress {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 16px auto 24px;
+}
+
+/* Sphere viewer page */
+
+body.view {
+  height: 100dvh;
+  overflow: hidden;
+  background: #000;
+}
+
+.viewer-full {
+  position: fixed;
+  inset: 0;
+}
+
+.viewer-full canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.view-top {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 8px;
+  right: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 5;
+}
+
+.ctl.back {
+  flex: none;
+  padding: 10px 14px;
+  text-decoration: none;
+  text-align: center;
+}
+
+body.view .version-badge {
+  top: calc(env(safe-area-inset-top) + 8px);
+  bottom: auto;
+}
+
+/* Home page list of spheres */
+
+.sphere-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.sphere-card {
+  display: block;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.sphere-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #222;
+  margin-bottom: 4px;
 }
 
 /* Stitch Lab */

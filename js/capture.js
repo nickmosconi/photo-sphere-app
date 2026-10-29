@@ -1,7 +1,9 @@
-import { showVersion, VERSION } from "./version.js?v=0.3.1";
-import * as db from "./db.js?v=0.3.1";
-import { buildSessionZip } from "./export.js?v=0.3.1";
-import { TARGETS } from "./targets.js?v=0.3.1";
+import { showVersion, VERSION } from "./version.js?v=0.4.0";
+import * as db from "./db.js?v=0.4.0";
+import { buildSessionZip } from "./export.js?v=0.4.0";
+import { makeSphere } from "./make-sphere.js?v=0.4.0";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.4.0";
+import { TARGETS } from "./targets.js?v=0.4.0";
 import {
   angleBetween,
   axisAngle,
@@ -14,14 +16,14 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.3.1";
+} from "./quat.js?v=0.4.0";
 
 showVersion();
 db.requestPersistentStorage();
 
 // Field of view across the long side of the frame for the iPhone main camera ("Back Camera"),
-// as tuned in the Stitch Lab on the first real session.
-const FOV_LONG_DEG = 68;
+// as tuned in the Stitch Lab.
+const FOV_LONG_DEG = STITCH_DEFAULTS.fovLongDeg;
 const CAPTURE_ANGLE_DEG = 3.5; // how close a dot must be to the ring's center
 const STEADY_MS = 300; // how long the phone must be held still before a photo
 const STEADY_DEG = 0.8; // how much movement still counts as "still"
@@ -45,6 +47,7 @@ let segmentStartMs = 0;
 let done = new Map(); // targetId -> shot details (without the photo)
 let capturing = false;
 let busy = false;
+let finishedSessionId = null; // session shown on the finished screen
 
 let latest = null; // latest raw orientation reading
 let q = null; // latest orientation as a quaternion
@@ -62,8 +65,9 @@ const view = { w: 0, h: 0, dpr: 1, f: 1 };
 // ---------- Start screen ----------
 
 $("new-button").addEventListener("click", () => beginCapture(null));
-$("finished-back").addEventListener("click", showStartScreen);
-$("finished-export").addEventListener("click", () => openExport(session.id));
+$("finished-back").addEventListener("click", () => showStartScreen());
+$("finished-export").addEventListener("click", () => openExport(finishedSessionId));
+$("finished-retry").addEventListener("click", () => buildSphere(finishedSessionId));
 $("cancel-button").addEventListener("click", cancelCapture);
 $("undo-button").addEventListener("click", undoLastShot);
 $("done-button").addEventListener("click", finishCapture);
@@ -102,6 +106,7 @@ function sessionRow(s) {
   li.querySelector(".session-meta").textContent = `${s.shotCount ?? 0} / ${TARGETS.length} photos · ${status}`;
   const actions = li.querySelector(".session-actions");
   if (s.status !== "complete") actions.append(button("Continue", () => beginCapture(s)));
+  if (s.shotCount > 0) actions.append(button("Make sphere", () => buildSphere(s.id)));
   actions.append(button("Export", () => openExport(s.id)));
   actions.append(
     button("Delete", async () => {
@@ -265,8 +270,42 @@ async function finishCapture() {
   await saveSession();
   stopCamera();
   releaseWakeLock();
-  $("finished-summary").textContent = `${done.size} of ${TARGETS.length} photos saved on this phone.`;
+  buildSphere(session.id);
+}
+
+// Stitches a session into a sphere on the phone, showing progress on the finished screen.
+async function buildSphere(sessionId) {
+  finishedSessionId = sessionId;
   showScreen("finished");
+  const title = $("finished-title");
+  const summary = $("finished-summary");
+  const progress = $("stitch-progress");
+  title.textContent = "Making your sphere…";
+  summary.textContent = "Keep this page open.";
+  progress.value = 0;
+  progress.hidden = false;
+  $("view-link").hidden = true;
+  $("finished-retry").hidden = true;
+  requestWakeLock();
+  try {
+    const sphere = await makeSphere(sessionId, (i, n) => {
+      progress.value = i / n;
+      summary.textContent = i < n ? `Adding photo ${i + 1} of ${n}…` : "Saving…";
+    });
+    title.textContent = "Your sphere is ready";
+    summary.textContent = `${sphere.width} × ${sphere.height}, made in ${Math.round(sphere.stitchSeconds)} seconds.`;
+    const link = $("view-link");
+    link.href = `view.html?id=${sphere.id}&v=${VERSION.slice(1)}`;
+    link.hidden = false;
+  } catch (err) {
+    console.error(err);
+    title.textContent = "Couldn't make the sphere";
+    summary.textContent = err.message;
+    $("finished-retry").hidden = false;
+  } finally {
+    progress.hidden = true;
+    releaseWakeLock();
+  }
 }
 
 async function undoLastShot() {

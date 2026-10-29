@@ -1,4 +1,4 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.3.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.4.0";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -84,69 +84,100 @@ export class Stitcher {
   // photos: [{ image, quaternion, quaternionAligned? }]. Images are copied to the GPU,
   // so the caller can free them afterwards.
   setPhotos(photos) {
-    const gl = this.gl;
-    this.photos.forEach((p) => gl.deleteTexture(p.texture));
-    this.photos = photos.map((p) => {
-      const texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, p.image);
-      gl.generateMipmap(gl.TEXTURE_2D);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      return {
-        texture,
-        width: p.image.width,
-        height: p.image.height,
-        quaternion: p.quaternion,
-        quaternionAligned: p.quaternionAligned ?? p.quaternion,
-      };
-    });
+    this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
+    this.photos = photos.map((p) => this.#upload(p));
   }
 
-  // Stitches the photos and draws the panorama into `target` (a 2D canvas, resized to fit).
+  // Stitches the photos given to setPhotos and draws the panorama into `target`
+  // (a 2D canvas, resized to fit). Fast enough to re-run on every slider move.
   // settings: { outputWidth, fovLongDeg, yawOffsetDeg, pitchOffsetDeg, rollOffsetDeg,
   //             feather, useAligned, tint, yaw0Deg }
   stitch(settings, target) {
-    const gl = this.gl;
-    const width = settings.outputWidth;
-    const height = width / 2;
-    this.#ensureSize(width, height);
+    this.#begin(settings);
+    this.photos.forEach((photo, i) => this.#drawPhoto(photo, i, this.photos.length, settings));
+    this.#finish(target);
+  }
 
+  // Same result, but with only one photo on the GPU at a time, to save memory on phones.
+  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned? }; each image is freed
+  // (see freeImage) once it has been copied to the GPU.
+  async stitchOneByOne(settings, target, count, loadPhoto, freeImage) {
+    this.#begin(settings);
+    for (let i = 0; i < count; i++) {
+      const p = await loadPhoto(i);
+      const photo = this.#upload(p);
+      freeImage?.(p.image);
+      this.#drawPhoto(photo, i, count, settings);
+      this.gl.deleteTexture(photo.texture);
+    }
+    this.#finish(target);
+  }
+
+  #upload(p) {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, p.image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return {
+      texture,
+      width: p.image.width,
+      height: p.image.height,
+      quaternion: p.quaternion,
+      quaternionAligned: p.quaternionAligned ?? p.quaternion,
+    };
+  }
+
+  #begin(settings) {
+    const gl = this.gl;
+    this.#ensureSize(settings.outputWidth, settings.outputWidth / 2);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  // Adds one photo's color × weight and weight into the float buffer.
+  #drawPhoto(photo, i, count, settings) {
+    const gl = this.gl;
     // Small fixed turn of the camera relative to the phone, the same for every photo.
     const offset = multiply(
       multiply(axisAngle([0, 1, 0], settings.yawOffsetDeg), axisAngle([1, 0, 0], settings.pitchOffsetDeg)),
       axisAngle([0, 0, 1], settings.rollOffsetDeg),
     );
     const tanHalf = Math.tan((settings.fovLongDeg * Math.PI) / 360);
+    const q = multiply(settings.useAligned ? photo.quaternionAligned : photo.quaternion, offset);
 
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.accFbo);
-    gl.viewport(0, 0, width, height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.viewport(0, 0, this.width, this.height);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE);
-
     const p = this.photoProgram;
     gl.useProgram(p.program);
     gl.uniform1i(p.uniforms.uPhoto, 0);
     gl.uniform1f(p.uniforms.uYaw0, ((settings.yaw0Deg ?? 0) * Math.PI) / 180);
     gl.uniform1f(p.uniforms.uFeather, settings.feather);
+    // The row-major camera→world matrix, read as column-major, is its transpose: world→camera.
+    gl.uniformMatrix3fv(p.uniforms.uWorldToCam, false, toMatrix3(q));
+    gl.uniform2f(p.uniforms.uSize, photo.width, photo.height);
+    gl.uniform1f(p.uniforms.uFocal, Math.max(photo.width, photo.height) / 2 / tanHalf);
+    const [r, g, b] = settings.tint ? tintColor(i, count) : [0, 0, 0];
+    gl.uniform4f(p.uniforms.uTint, r, g, b, settings.tint ? 0.35 : 0);
     gl.activeTexture(gl.TEXTURE0);
-    this.photos.forEach((photo, i) => {
-      const q = multiply(settings.useAligned ? photo.quaternionAligned : photo.quaternion, offset);
-      // The row-major camera→world matrix, read as column-major, is its transpose: world→camera.
-      gl.uniformMatrix3fv(p.uniforms.uWorldToCam, false, toMatrix3(q));
-      gl.uniform2f(p.uniforms.uSize, photo.width, photo.height);
-      gl.uniform1f(p.uniforms.uFocal, Math.max(photo.width, photo.height) / 2 / tanHalf);
-      const [r, g, b] = settings.tint ? tintColor(i, this.photos.length) : [0, 0, 0];
-      gl.uniform4f(p.uniforms.uTint, r, g, b, settings.tint ? 0.35 : 0);
-      gl.bindTexture(gl.TEXTURE_2D, photo.texture);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-    });
+    gl.bindTexture(gl.TEXTURE_2D, photo.texture);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
 
+  // Divides out the weights and copies the result into the target canvas.
+  #finish(target) {
+    const gl = this.gl;
+    const { width, height } = this;
+    gl.bindVertexArray(this.vao);
+    gl.viewport(0, 0, width, height);
     gl.disable(gl.BLEND);
     const n = this.normalizeProgram;
     gl.useProgram(n.program);
@@ -206,10 +237,12 @@ export class Stitcher {
     this.width = this.height = 0;
   }
 
+  // Frees everything, including the WebGL context (phones only allow a few at once).
   dispose() {
     this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
     this.photos = [];
     this.#freeBuffers();
+    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
 

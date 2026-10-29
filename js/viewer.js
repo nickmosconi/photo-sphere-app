@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { cameraDirection, fromDeviceOrientation, yawPitchFromDirection } from "./quat.js?v=0.4.0";
 
 const DEG = Math.PI / 180;
 
@@ -25,6 +26,9 @@ export class PanoViewer {
     this.lat = 0; // degrees above the horizon
     this.pointers = new Map();
     this.pending = false;
+    this.gyro = false; // look around by moving the phone
+    this.gyroRef = null; // phone yaw that corresponds to lon = 0
+    this.onOrientation = this.onOrientation.bind(this);
 
     this.bindInput();
     new ResizeObserver(() => this.resize()).observe(container);
@@ -77,6 +81,28 @@ export class PanoViewer {
     this.renderer.render(this.scene, this.camera);
   }
 
+  // Turns "move the phone to look around" on or off. On iOS, turning it on must happen in a tap.
+  async setGyro(on) {
+    if (on && typeof DeviceOrientationEvent?.requestPermission === "function") {
+      const result = await DeviceOrientationEvent.requestPermission();
+      if (result !== "granted") throw new Error("Motion access was not allowed.");
+    }
+    this.gyro = on;
+    this.gyroRef = null;
+    if (on) window.addEventListener("deviceorientation", this.onOrientation);
+    else window.removeEventListener("deviceorientation", this.onOrientation);
+  }
+
+  onOrientation(e) {
+    if (e.alpha == null || e.beta == null || e.gamma == null) return;
+    const { yaw, pitch } = yawPitchFromDirection(cameraDirection(fromDeviceOrientation(e.alpha, e.beta, e.gamma)));
+    // Keep looking where we were when the mode was switched on.
+    this.gyroRef ??= yaw - this.lon;
+    this.lon = yaw - this.gyroRef;
+    this.lat = pitch;
+    this.requestRender();
+  }
+
   setFov(fov) {
     this.camera.fov = Math.max(20, Math.min(110, fov));
     this.camera.updateProjectionMatrix();
@@ -93,10 +119,14 @@ export class PanoViewer {
       const prev = this.pointers.get(e.pointerId);
       if (!prev) return;
       if (this.pointers.size === 1) {
-        // The scene follows the finger.
+        // The scene follows the finger. While moving the phone steers, dragging just turns sideways.
         const degPerPx = this.camera.fov / c.clientHeight;
-        this.lon -= (e.clientX - prev.x) * degPerPx;
-        this.lat += (e.clientY - prev.y) * degPerPx;
+        if (this.gyro && this.gyroRef != null) {
+          this.gyroRef += (e.clientX - prev.x) * degPerPx;
+        } else {
+          this.lon -= (e.clientX - prev.x) * degPerPx;
+          this.lat += (e.clientY - prev.y) * degPerPx;
+        }
         this.requestRender();
       } else if (this.pointers.size === 2) {
         const before = this.pinchDistance();
