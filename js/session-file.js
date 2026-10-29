@@ -1,4 +1,4 @@
-import { loadJSZip } from "./jszip.js?v=0.3.0";
+import { loadJSZip } from "./jszip.js?v=0.3.1";
 
 // Opens a session .zip exported by the capture page. Photos larger than maxSize on their
 // long side are scaled down, which is plenty for the panorama and saves memory.

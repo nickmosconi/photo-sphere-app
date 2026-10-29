@@ -1,14 +1,16 @@
-import { showVersion } from "./version.js?v=0.3.0";
-import { Stitcher } from "./stitcher.js?v=0.3.0";
-import { PanoViewer } from "./viewer.js?v=0.3.0";
-import { loadSessionZip } from "./session-file.js?v=0.3.0";
-import { makeSyntheticSession } from "./synthetic.js?v=0.3.0";
+import { showVersion } from "./version.js?v=0.3.1";
+import { Stitcher } from "./stitcher.js?v=0.3.1";
+import { PanoViewer } from "./viewer.js?v=0.3.1";
+import { loadSessionZip } from "./session-file.js?v=0.3.1";
+import { makeSyntheticSession } from "./synthetic.js?v=0.3.1";
 
 showVersion();
 
 // Starting values. When good values are found, paste the "Copy settings" output here.
+// 68° fits the first real iPhone session best (overlap agreement was lowest at 67–68°);
+// the offsets showed no clear preference, so they stay at 0.
 const DEFAULTS = {
-  fovLongDeg: 70,
+  fovLongDeg: 68,
   yawOffsetDeg: 0,
   pitchOffsetDeg: 0,
   rollOffsetDeg: 0,

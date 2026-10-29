@@ -1,7 +1,7 @@
-import { showVersion, VERSION } from "./version.js?v=0.3.0";
-import * as db from "./db.js?v=0.3.0";
-import { buildSessionZip } from "./export.js?v=0.3.0";
-import { TARGETS } from "./targets.js?v=0.3.0";
+import { showVersion, VERSION } from "./version.js?v=0.3.1";
+import * as db from "./db.js?v=0.3.1";
+import { buildSessionZip } from "./export.js?v=0.3.1";
+import { TARGETS } from "./targets.js?v=0.3.1";
 import {
   angleBetween,
   axisAngle,
@@ -14,14 +14,14 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.3.0";
+} from "./quat.js?v=0.3.1";
 
 showVersion();
 db.requestPersistentStorage();
 
-// Estimated field of view across the long side of the frame (iPhone main camera, ~24–26 mm
-// equivalent). Only a starting guess; the Stitch Lab (Phase 3) will tune it.
-const FOV_LONG_DEG = 70;
+// Field of view across the long side of the frame for the iPhone main camera ("Back Camera"),
+// as tuned in the Stitch Lab on the first real session.
+const FOV_LONG_DEG = 68;
 const CAPTURE_ANGLE_DEG = 3.5; // how close a dot must be to the ring's center
 const STEADY_MS = 300; // how long the phone must be held still before a photo
 const STEADY_DEG = 0.8; // how much movement still counts as "still"
@@ -197,7 +197,7 @@ function newSession() {
     video: { width: vw, height: vh },
     cameraLabel: stream.getVideoTracks()[0].label,
     fovEstimate: {
-      note: "Guess for the iPhone main camera; tune in the Stitch Lab",
+      note: "Tuned in the Stitch Lab for the iPhone main camera",
       longSideDeg: FOV_LONG_DEG,
       widthDeg: fov(vw),
       heightDeg: fov(vh),

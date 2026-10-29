@@ -1,5 +1,5 @@
-import { TARGETS } from "./targets.js?v=0.3.0";
-import { axisAngle, fromDeviceOrientation, multiply, toMatrix3 } from "./quat.js?v=0.3.0";
+import { TARGETS } from "./targets.js?v=0.3.1";
+import { axisAngle, fromDeviceOrientation, multiply, toMatrix3 } from "./quat.js?v=0.3.1";
 
 // A fake capture session made from a computer-drawn test sphere, with exactly known
 // orientations and field of view. If this stitches cleanly but a real session doesn't,
@@ -7,7 +7,7 @@ import { axisAngle, fromDeviceOrientation, multiply, toMatrix3 } from "./quat.js
 
 const PHOTO_WIDTH = 600; // portrait 3:4, like the iPhone frames (scaled down)
 const PHOTO_HEIGHT = 800;
-const TRUE_FOV_LONG_DEG = 70;
+const TRUE_FOV_LONG_DEG = 68; // same as the iPhone main camera, so the default settings fit
 
 // noiseDeg: typical size of a random orientation error added to each photo's recorded quaternion.
 export async function makeSyntheticSession({ noiseDeg = 0, onProgress } = {}) {

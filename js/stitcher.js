@@ -1,4 +1,4 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.3.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.3.1";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
