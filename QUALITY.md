@@ -2,6 +2,8 @@
 
 Assessed on 2026-10-28 at version v0.5.0, using the first real 30-photo capture (indoor living room, evening light, iPhone Pro "Back Camera", 3024 × 4032 frames).
 
+**Update (v0.6.0):** quick fixes 1–4 below are done: bigger spheres, shooting tips, sharpest-frame capture, and a readout of the camera's adjustable settings. See "Progress" at the end.
+
 ## Summary
 
 - **The biggest quality loss is the size of the finished sphere, not the camera.** The camera frames hold about 59 pixels per degree; the 4096-wide sphere keeps about 11. A phone screen in the viewer shows about 23 pixels per degree, so every sphere pixel is stretched about 2× when you look at it. That is why spheres look soft even where the stitching is perfect.
@@ -55,7 +57,7 @@ Scores out of 5 for a proof of concept.
 ## 4. Bugs found during this review
 
 1. **8192-wide output came out blank.** On the first stitch, the output buffer was created after the float buffer had been bound for reading, which unbound it and made the final pass read from what it was drawing into. Fixed in v0.5.1.
-2. **The Stitch Lab can't use full-size photos.** It keeps all 30 photos on the graphics card (about 2 GB at full size), which fails silently. Open; fix by using the one-photo-at-a-time path.
+2. **The Stitch Lab can't use full-size photos.** It keeps all 30 photos on the graphics card (about 2 GB at full size), which fails silently. Fixed in v0.6.0: the Lab keeps photos at 2048 (30 pixels per degree, enough for 8192-wide output), and the stitcher now reports graphics errors instead of returning a blank image.
 3. **Still unverified on the iPhone:** how long Make sphere takes and whether memory holds up; Google Photos recognizing the 360° photo; resuming a paused capture.
 
 ## 5. How to get higher-quality spheres
@@ -93,3 +95,17 @@ Gives Camera-app quality photos (Smart HDR, Deep Fusion, 24 or 48 MP), locked ex
 ## 6. Recommendation
 
 Do steps 1–3 next, since together they address most of what looks "low quality". Then measure Make sphere time on the iPhone and confirm Google Photos shows the result as 360°. With those results, Phase 6 can weigh the remaining web limits against building a native app.
+
+## Progress
+
+### v0.6.0 (2026-10-28)
+
+| Step | What changed | Tested on the PC |
+|---|---|---|
+| 1. Bigger spheres | The phone makes 5792 × 2896 spheres (was 4096 × 2048) from photos scaled to 3072 (was 2048). If the phone runs out of memory, it falls back to 4096 automatically. The Lab offers 5792 and 8192. | Living room: 5792 × 2896, 2.5 MB, 23 s on the PC (was 9 s at 4096). Clearly sharper side by side. Forcing a failure fell back to 4096 correctly. |
+| 2. Shooting tips | The capture start screen shows a picture (turn the phone around its camera, not at arm's length around you) and three tips: turn the phone not your body, keep near things 2 steps away, use good light. | Picture rendered and checked. |
+| 3. Sharpest frame | Each photo compares 4 consecutive camera frames (sharpness of a full-resolution patch in the middle) and keeps the sharpest, with the orientation at that moment. The score is saved with the photo. | Fake camera alternating blurry and sharp frames: the sharp one was kept. |
+| 4. Exposure lock check | Sensor check lists the camera settings Safari lets a page change (for example exposureMode, whiteBalanceMode). | Listing checked with a simulated camera; the real list needs the iPhone. |
+| Reliability | The stitcher now stops with an error on graphics failures (lost context, WebGL errors, canvas too big) instead of producing a blank sphere. | 8192 blank-output bug would now be caught. |
+
+Still to check on the iPhone: Make sphere time and memory at 5792, what Sensor check lists under "adjustable", whether sharpest-frame capture slows the sweep, and Google Photos showing the result as 360°.

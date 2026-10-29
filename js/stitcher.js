@@ -1,5 +1,5 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.5.1";
-import { photoOrientation } from "./stitch-settings.js?v=0.5.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.6.0";
+import { photoOrientation } from "./stitch-settings.js?v=0.6.0";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -204,11 +204,13 @@ export class Stitcher {
       target.height = height;
     }
     const ctx = target.getContext("2d");
+    if (!ctx) throw new Error(`This device can't hold a ${width}×${height} image.`);
 
     if (this.canvasFits) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.uniform1i(n.uniforms.uFlip, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      this.#checkErrors();
       ctx.drawImage(this.canvas, 0, 0);
       return;
     }
@@ -218,7 +220,16 @@ export class Stitcher {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels.data);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.#checkErrors();
     ctx.putImageData(this.pixels, 0, 0);
+  }
+
+  // Fails loudly instead of handing back a blank image (phones can run out of graphics memory).
+  #checkErrors() {
+    const gl = this.gl;
+    if (gl.isContextLost()) throw new Error("The graphics memory ran out while stitching.");
+    const error = gl.getError();
+    if (error !== gl.NO_ERROR) throw new Error(`Stitching failed (WebGL error ${error}).`);
   }
 
   #ensureSize(width, height) {

@@ -1,9 +1,9 @@
-import { showVersion, VERSION } from "./version.js?v=0.5.1";
-import * as db from "./db.js?v=0.5.1";
-import { buildSessionZip } from "./export.js?v=0.5.1";
-import { makeSphere } from "./make-sphere.js?v=0.5.1";
-import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.5.1";
-import { TARGETS } from "./targets.js?v=0.5.1";
+import { showVersion, VERSION } from "./version.js?v=0.6.0";
+import * as db from "./db.js?v=0.6.0";
+import { buildSessionZip } from "./export.js?v=0.6.0";
+import { makeSphere } from "./make-sphere.js?v=0.6.0";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.6.0";
+import { TARGETS } from "./targets.js?v=0.6.0";
 import {
   angleBetween,
   axisAngle,
@@ -16,7 +16,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.5.1";
+} from "./quat.js?v=0.6.0";
 
 showVersion();
 db.requestPersistentStorage();
@@ -28,6 +28,8 @@ const CAPTURE_ANGLE_DEG = 3.5; // how close a dot must be to the ring's center
 const STEADY_MS = 300; // how long the phone must be held still before a photo
 const STEADY_DEG = 0.8; // how much movement still counts as "still"
 const JPEG_QUALITY = 0.9;
+const BURST_FRAMES = 4; // frames compared for each photo; the sharpest is kept
+const SHARPNESS_PATCH = 384; // size of the middle patch used to judge sharpness
 const COMPASS_SAMPLES_NEEDED = 45; // ~0.75 s of compass readings to line up a resumed capture
 const COMPASS_WAIT_MS = 4000; // give up on the compass after this and assume no shift
 
@@ -36,6 +38,9 @@ const video = $("camera");
 const overlay = $("overlay");
 const ctx = overlay.getContext("2d");
 const frameCanvas = document.createElement("canvas");
+const patchCanvas = document.createElement("canvas");
+patchCanvas.width = patchCanvas.height = SHARPNESS_PATCH;
+const patchCtx = patchCanvas.getContext("2d", { willReadFrequently: true });
 
 let stream = null;
 let listening = false;
@@ -470,8 +475,6 @@ async function takePhoto(target) {
   busy = true;
   holdProgress = 0;
   ringSince = null;
-  const reading = { ...latest };
-  const quaternion = q;
   try {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -479,8 +482,23 @@ async function takePhoto(target) {
       frameCanvas.width = vw;
       frameCanvas.height = vh;
     }
-    frameCanvas.getContext("2d").drawImage(video, 0, 0, vw, vh);
-    const timestamp = Date.now();
+    // Compare a few consecutive frames and keep the sharpest (least motion blur), along with
+    // the orientation at that moment.
+    let best = -1;
+    let reading = null;
+    let quaternion = null;
+    let timestamp = 0;
+    for (let k = 0; k < BURST_FRAMES; k++) {
+      if (k > 0) await nextVideoFrame();
+      const score = frameSharpness(vw, vh);
+      if (score > best) {
+        best = score;
+        frameCanvas.getContext("2d").drawImage(video, 0, 0, vw, vh);
+        reading = { ...latest };
+        quaternion = q;
+        timestamp = Date.now();
+      }
+    }
     flash();
     haptic();
     const blob = await new Promise((resolve, reject) =>
@@ -499,6 +517,8 @@ async function takePhoto(target) {
       screenAngle: screen.orientation?.angle ?? window.orientation ?? 0,
       width: vw,
       height: vh,
+      sharpness: best,
+      framesCompared: BURST_FRAMES,
       blob,
     };
     shot.id = await db.addShot(shot);
@@ -512,6 +532,33 @@ async function takePhoto(target) {
     busy = false;
     anchor = null;
   }
+}
+
+// Waits for the camera's next frame (or a short moment if the browser can't tell us).
+function nextVideoFrame() {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 60);
+    video.requestVideoFrameCallback?.(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+// How sharp the current video frame is: average edge strength (|Laplacian| of green) in a
+// full-resolution patch from the middle of the frame. Motion blur lowers it.
+function frameSharpness(vw, vh) {
+  const s = SHARPNESS_PATCH;
+  patchCtx.drawImage(video, (vw - s) / 2, (vh - s) / 2, s, s, 0, 0, s, s);
+  const d = patchCtx.getImageData(0, 0, s, s).data;
+  let sum = 0;
+  for (let y = 1; y < s - 1; y++) {
+    for (let x = 1; x < s - 1; x++) {
+      const i = (y * s + x) * 4 + 1;
+      sum += Math.abs(4 * d[i] - d[i - 4] - d[i + 4] - d[i - s * 4] - d[i + s * 4]);
+    }
+  }
+  return sum / ((s - 2) * (s - 2));
 }
 
 function flash() {

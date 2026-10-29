@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sphere Cam · Capture</title>
-  <link rel="stylesheet" href="css/style.css?v=0.5.1">
+  <link rel="stylesheet" href="css/style.css?v=0.6.0">
 </head>
 <body class="capture">
   <video id="camera" playsinline muted autoplay></video>
@@ -28,14 +28,37 @@
     <div class="screen-inner">
       <h1>Capture</h1>
       <p class="tip">
-        Stand in one spot and hold the phone upright. Turn the phone around its camera, not around
-        your body. Line up each dot with the ring and hold still; the photo takes itself.
+        Hold the phone upright. Line up each dot with the ring and hold still; the photo takes itself.
       </p>
+      <figure class="tips">
+        <svg viewBox="0 0 320 132" role="img" aria-label="Seen from above: turn the phone around its own camera, not at arm's length around your body">
+          <text x="75" y="16" class="ok">✓ Turn the phone</text>
+          <circle cx="75" cy="96" r="16" class="head" />
+          <rect x="66" y="64" width="18" height="6" rx="2" class="phone" />
+          <circle cx="75" cy="67" r="2.5" class="lens" />
+          <path d="M 52 70 A 24 24 0 0 1 98 70" class="arrow ok-stroke" marker-end="url(#ok-tip)" />
+          <text x="245" y="16" class="bad">✗ Swing it around you</text>
+          <circle cx="245" cy="96" r="16" class="head" />
+          <line x1="245" y1="80" x2="245" y2="44" class="arm" />
+          <rect x="236" y="38" width="18" height="6" rx="2" class="phone" />
+          <path d="M 205 70 A 52 52 0 0 1 285 70" class="arrow bad-stroke" marker-end="url(#bad-tip)" />
+          <text x="160" y="128" class="note">seen from above</text>
+          <defs>
+            <marker id="ok-tip" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="ok-fill" /></marker>
+            <marker id="bad-tip" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="bad-fill" /></marker>
+          </defs>
+        </svg>
+        <ul>
+          <li><b>Turn the phone, not your body.</b> Keep it close to your face and pivot it around its camera, shuffling your feet in place. This is what stops doubled edges.</li>
+          <li><b>Keep near things 2 steps away</b> where you can. Close furniture shifts between photos the most.</li>
+          <li><b>Use good, even light.</b> Daylight or all the lights on gives sharper, cleaner photos.</li>
+        </ul>
+      </figure>
       <button id="new-button" class="big-button" type="button">New capture</button>
       <p id="start-error" class="error"></p>
       <h2>Saved captures</h2>
       <ul id="session-list" class="session-list"></ul>
-      <p><a href="./?v=0.5.1">← Home</a></p>
+      <p><a href="./?v=0.6.0">← Home</a></p>
     </div>
   </section>
 
@@ -48,7 +71,7 @@
       <p><button id="finished-retry" class="small-button" type="button" hidden>Try again</button></p>
       <p><button id="finished-export" class="text-button" type="button">Export photos (.zip)</button></p>
       <p><button id="finished-back" class="text-button" type="button">Back to captures</button></p>
-      <p><a href="./?v=0.5.1">← Home</a></p>
+      <p><a href="./?v=0.6.0">← Home</a></p>
     </div>
   </section>
 
@@ -62,6 +85,6 @@
     </div>
   </section>
 
-  <script type="module" src="js/capture.js?v=0.5.1"></script>
+  <script type="module" src="js/capture.js?v=0.6.0"></script>
 </body>
 </html>

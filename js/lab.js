@@ -1,11 +1,11 @@
-import { showVersion } from "./version.js?v=0.5.1";
-import { grayCopy, refineOrientations } from "./align.js?v=0.5.1";
-import { computeGains, smallCopy } from "./exposure.js?v=0.5.1";
-import { Stitcher } from "./stitcher.js?v=0.5.1";
-import { PanoViewer } from "./viewer.js?v=0.5.1";
-import { loadSessionZip } from "./session-file.js?v=0.5.1";
-import { makeSyntheticSession } from "./synthetic.js?v=0.5.1";
-import { MAX_PHOTO_SIZE, photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.5.1";
+import { showVersion } from "./version.js?v=0.6.0";
+import { grayCopy, refineOrientations } from "./align.js?v=0.6.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.6.0";
+import { Stitcher } from "./stitcher.js?v=0.6.0";
+import { PanoViewer } from "./viewer.js?v=0.6.0";
+import { loadSessionZip } from "./session-file.js?v=0.6.0";
+import { makeSyntheticSession } from "./synthetic.js?v=0.6.0";
+import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.6.0";
 
 showVersion();
 
@@ -19,6 +19,10 @@ const SLIDERS = [
 ];
 
 const SETTINGS_KEY = "sphere-cam-lab-settings";
+// The Lab keeps every photo on the graphics card so sliders can re-stitch instantly, so photos
+// are kept smaller than on the phone (all 30 at full size need about 2 GB and fail).
+// 2048 still gives 30 pixels per degree, more than an 8192-wide sphere can hold.
+const LAB_PHOTO_SIZE = 2048;
 
 const $ = (id) => document.getElementById(id);
 const flatCanvas = $("flat-canvas"); // the stitcher draws here; the 360° view reads from it too
@@ -173,7 +177,7 @@ window.addEventListener("drop", (e) => {
 async function openZip(file) {
   setInfo(`Opening ${file.name}…`);
   try {
-    const data = await loadSessionZip(file, MAX_PHOTO_SIZE, (i, n) => setInfo(`Loading photos… ${i + 1} / ${n}`));
+    const data = await loadSessionZip(file, LAB_PHOTO_SIZE, (i, n) => setInfo(`Loading photos… ${i + 1} / ${n}`));
     await useSession(data);
   } catch (err) {
     console.error(err);

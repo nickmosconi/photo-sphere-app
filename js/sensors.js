@@ -1,4 +1,4 @@
-import { showVersion } from "./version.js?v=0.5.1";
+import { showVersion } from "./version.js?v=0.6.0";
 
 showVersion();
 
@@ -112,6 +112,13 @@ document.addEventListener("visibilitychange", () => {
   if (stream.getVideoTracks()[0]?.readyState === "ended") cameraStopped();
 });
 
+// A capability is a list of choices, a {min, max} range, or a plain value.
+function describeCapability(value) {
+  if (Array.isArray(value)) return value.join("/") || "—";
+  if (value && typeof value === "object" && "min" in value) return `${value.min}–${value.max}`;
+  return String(value);
+}
+
 function updateReadout() {
   const track = stream?.getVideoTracks()[0];
   const settings = track?.getSettings?.() ?? {};
@@ -135,6 +142,14 @@ function updateReadout() {
     `max      ${caps.width?.max ?? "?"} × ${caps.height?.max ?? "?"}`,
     `camera   ${(track?.label || "—").slice(0, 30)}`,
   ];
+  if (track) {
+    // Camera settings the browser lets a page change, e.g. whether exposure can be locked.
+    const basic = ["width", "height", "aspectRatio", "frameRate", "deviceId", "groupId", "facingMode", "resizeMode"];
+    const extras = Object.entries(caps)
+      .filter(([key]) => !basic.includes(key))
+      .map(([key, value]) => `${key}: ${describeCapability(value)}`);
+    lines.push("", "adjustable:", ...(extras.length ? extras.flatMap((e) => wrap(e, 40)) : ["none"]));
+  }
   if (motionProblem) {
     lines.push("", ...wrap(motionProblem, 40));
   } else if (eventRate === 0 && latest.alpha == null) {
