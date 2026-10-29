@@ -37,6 +37,110 @@ p {
   line-height: 1.5;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+a {
+  color: var(--accent);
+}
+
+.big-button {
+  display: inline-block;
+  min-width: 200px;
+  padding: 18px 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.big-button:disabled {
+  opacity: 0.5;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.error {
+  color: #ff8a8a;
+  min-height: 1.5em;
+}
+
+/* Capture page: full-screen camera with an overlay of sensor numbers */
+
+body.capture {
+  height: 100dvh;
+  overflow: hidden;
+  background: #000;
+}
+
+body.capture video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+.readout {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre;
+}
+
+.readout:empty {
+  display: none;
+}
+
+.back-link {
+  position: fixed;
+  left: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  text-decoration: none;
+  z-index: 5;
+}
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--bg);
+  text-align: center;
+}
+
+.start-screen p {
+  max-width: 360px;
+}
+
 .version-badge {
   position: fixed;
   right: 8px;
