@@ -1,4 +1,4 @@
-import { showVersion } from "./version.js?v=0.4.0";
+import { showVersion } from "./version.js?v=0.4.1";
 
 showVersion();
 

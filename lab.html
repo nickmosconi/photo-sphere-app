@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sphere Cam · Stitch Lab</title>
-  <link rel="stylesheet" href="css/style.css?v=0.4.0">
+  <link rel="stylesheet" href="css/style.css?v=0.4.1">
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
   </script>
 </head>
 <body class="lab">
   <header class="lab-header">
-    <a href="./?v=0.4.0">← Home</a>
+    <a href="./?v=0.4.1">← Home</a>
     <h1>Stitch Lab</h1>
   </header>
 
@@ -37,6 +37,7 @@
         <h2>Tuning</h2>
         <div id="sliders"></div>
         <label class="check"><input id="use-aligned" type="checkbox"> Use compass-aligned orientations</label>
+        <label class="check"><input id="match-exposure" type="checkbox"> Match brightness between photos</label>
         <label class="check"><input id="tint" type="checkbox"> Tint each photo (shows where seams are)</label>
         <label class="field">
           Output size
@@ -62,6 +63,6 @@
     </main>
   </div>
 
-  <script type="module" src="js/lab.js?v=0.4.0"></script>
+  <script type="module" src="js/lab.js?v=0.4.1"></script>
 </body>
 </html>

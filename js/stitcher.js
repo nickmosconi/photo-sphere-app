@@ -1,4 +1,4 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.4.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.4.1";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -27,6 +27,9 @@ uniform vec2 uSize;     // photo size in pixels
 uniform float uFocal;   // photo focal length in pixels
 uniform float uYaw0;    // yaw at the center of the panorama (radians)
 uniform float uFeather; // 0..1: how far in from the photo edge the weight ramps up
+uniform float uSharpness; // 0 = average overlapping photos; higher = favor the photo whose center is nearest
+uniform vec3 uGain;     // brightness/color correction for this photo
+uniform vec3 uVignette; // how much to brighten toward the corners (lens vignetting)
 uniform vec4 uTint;     // rgb + amount, to show which photo is where
 out vec4 outColor;
 const float PI = 3.14159265358979;
@@ -39,8 +42,15 @@ void main() {
   vec2 uv = (v.xy / -v.z) * uFocal / uSize + 0.5;
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
   vec2 e = min(uv, 1.0 - uv) * 2.0; // 0 at the edge, 1 at the center
-  float w = max(smoothstep(0.0, uFeather, e.x) * smoothstep(0.0, uFeather, e.y), 1e-3);
+  float edgeFade = smoothstep(0.0, uFeather, e.x) * smoothstep(0.0, uFeather, e.y);
+  // Angle from the photo's center, in units of half its narrow field of view. Weighting by
+  // exp(−sharpness × angle) lets the nearest photo win, so small misalignments show up as
+  // a slight step at a seam instead of a see-through double image.
+  float angle = acos(clamp(-v.z / length(v), -1.0, 1.0)) / atan(0.5 * min(uSize.x, uSize.y) / uFocal);
+  float w = max(edgeFade * exp(-uSharpness * angle), 1e-6);
   vec3 c = texture(uPhoto, vec2(uv.x, 1.0 - uv.y)).rgb; // image rows run top to bottom
+  float r2 = dot(uv - 0.5, uv - 0.5) * 2.0; // 0 at the center, 1 in the corners
+  c *= uGain * exp(uVignette * r2);
   c = mix(c, uTint.rgb, uTint.a);
   outColor = vec4(c * w, w);
 }`;
@@ -81,7 +91,7 @@ export class Stitcher {
     this.pixels = null;
   }
 
-  // photos: [{ image, quaternion, quaternionAligned? }]. Images are copied to the GPU,
+  // photos: [{ image, quaternion, quaternionAligned?, gain? }]. Images are copied to the GPU,
   // so the caller can free them afterwards.
   setPhotos(photos) {
     this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
@@ -91,7 +101,7 @@ export class Stitcher {
   // Stitches the photos given to setPhotos and draws the panorama into `target`
   // (a 2D canvas, resized to fit). Fast enough to re-run on every slider move.
   // settings: { outputWidth, fovLongDeg, yawOffsetDeg, pitchOffsetDeg, rollOffsetDeg,
-  //             feather, useAligned, tint, yaw0Deg }
+  //             feather, sharpness, matchExposure, vignette, useAligned, tint, yaw0Deg }
   stitch(settings, target) {
     this.#begin(settings);
     this.photos.forEach((photo, i) => this.#drawPhoto(photo, i, this.photos.length, settings));
@@ -99,7 +109,7 @@ export class Stitcher {
   }
 
   // Same result, but with only one photo on the GPU at a time, to save memory on phones.
-  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned? }; each image is freed
+  // loadPhoto(i) resolves to { image, quaternion, quaternionAligned?, gain? }; each image is freed
   // (see freeImage) once it has been copied to the GPU.
   async stitchOneByOne(settings, target, count, loadPhoto, freeImage) {
     this.#begin(settings);
@@ -129,6 +139,7 @@ export class Stitcher {
       height: p.image.height,
       quaternion: p.quaternion,
       quaternionAligned: p.quaternionAligned ?? p.quaternion,
+      gain: p.gain ?? [1, 1, 1],
     };
   }
 
@@ -161,6 +172,9 @@ export class Stitcher {
     gl.uniform1i(p.uniforms.uPhoto, 0);
     gl.uniform1f(p.uniforms.uYaw0, ((settings.yaw0Deg ?? 0) * Math.PI) / 180);
     gl.uniform1f(p.uniforms.uFeather, settings.feather);
+    gl.uniform1f(p.uniforms.uSharpness, settings.sharpness ?? 0);
+    gl.uniform3fv(p.uniforms.uGain, settings.matchExposure ? photo.gain : [1, 1, 1]);
+    gl.uniform3fv(p.uniforms.uVignette, (settings.matchExposure && settings.vignette) || [0, 0, 0]);
     // The row-major camera→world matrix, read as column-major, is its transpose: world→camera.
     gl.uniformMatrix3fv(p.uniforms.uWorldToCam, false, toMatrix3(q));
     gl.uniform2f(p.uniforms.uSize, photo.width, photo.height);

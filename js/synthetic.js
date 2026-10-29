@@ -1,5 +1,5 @@
-import { TARGETS } from "./targets.js?v=0.4.0";
-import { axisAngle, fromDeviceOrientation, multiply, toMatrix3 } from "./quat.js?v=0.4.0";
+import { TARGETS } from "./targets.js?v=0.4.1";
+import { axisAngle, fromDeviceOrientation, multiply, toMatrix3 } from "./quat.js?v=0.4.1";
 
 // A fake capture session made from a computer-drawn test sphere, with exactly known
 // orientations and field of view. If this stitches cleanly but a real session doesn't,

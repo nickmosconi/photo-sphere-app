@@ -1,39 +1,60 @@
-import * as db from "./db.js?v=0.4.0";
-import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.4.0";
-import { MAX_PHOTO_SIZE, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.4.0";
-import { Stitcher } from "./stitcher.js?v=0.4.0";
-import { addGPanoXmp } from "./xmp.js?v=0.4.0";
+import * as db from "./db.js?v=0.4.1";
+import { computeGains, SMALL_SIZE, smallCopy } from "./exposure.js?v=0.4.1";
+import { canvasToJpeg, decodeImage, freeImage } from "./images.js?v=0.4.1";
+import { MAX_PHOTO_SIZE, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.4.1";
+import { Stitcher } from "./stitcher.js?v=0.4.1";
+import { addGPanoXmp } from "./xmp.js?v=0.4.1";
 
 const JPEG_QUALITY = 0.92;
 const THUMB_WIDTH = 640;
 
 // Stitches a saved capture session into a 360° JPEG and saves it as a sphere.
-// onProgress(done, total) is called as photos are added.
+// onProgress(fraction, message) reports how far along it is.
 export async function makeSphere(sessionId, onProgress) {
   const started = performance.now();
   const session = await db.getSession(sessionId);
   const shots = await db.getShots(sessionId);
   if (shots.length === 0) throw new Error("This capture has no photos.");
-
+  const n = shots.length;
   const settings = { ...STITCH_DEFAULTS, yaw0Deg: session.yaw0Deg ?? 0 };
+
+  // First pass: small copies of every photo, to work out brightness matching.
+  for (const [i, shot] of shots.entries()) {
+    onProgress?.(i / (2 * n), `Matching brightness… ${i + 1} of ${n}`);
+    const image = await decodeImage(shot.blob, SMALL_SIZE);
+    shot.small = smallCopy(image);
+    freeImage(image);
+  }
+  if (settings.matchExposure) {
+    const { gains, vignette } = computeGains(shots, settings);
+    shots.forEach((shot, i) => (shot.gain = gains[i]));
+    settings.vignette = vignette;
+  }
+
+  // Second pass: stitch the full photos, one at a time.
   const canvas = document.createElement("canvas");
   const stitcher = new Stitcher();
   try {
     await stitcher.stitchOneByOne(
       settings,
       canvas,
-      shots.length,
+      n,
       async (i) => {
-        onProgress?.(i, shots.length);
+        onProgress?.((n + i) / (2 * n), `Adding photo ${i + 1} of ${n}…`);
         const shot = shots[i];
-        return { image: await decodeImage(shot.blob, MAX_PHOTO_SIZE), quaternion: shot.quaternion, quaternionAligned: shot.quaternionAligned };
+        return {
+          image: await decodeImage(shot.blob, MAX_PHOTO_SIZE),
+          quaternion: shot.quaternion,
+          quaternionAligned: shot.quaternionAligned,
+          gain: shot.gain,
+        };
       },
       freeImage,
     );
   } finally {
     stitcher.dispose();
   }
-  onProgress?.(shots.length, shots.length);
+  onProgress?.(1, "Saving…");
 
   const { width, height } = canvas;
   const headingDeg = poseHeading(session, shots);

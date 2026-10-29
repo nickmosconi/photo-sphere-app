@@ -1,9 +1,10 @@
-import { showVersion } from "./version.js?v=0.4.0";
-import { Stitcher } from "./stitcher.js?v=0.4.0";
-import { PanoViewer } from "./viewer.js?v=0.4.0";
-import { loadSessionZip } from "./session-file.js?v=0.4.0";
-import { makeSyntheticSession } from "./synthetic.js?v=0.4.0";
-import { MAX_PHOTO_SIZE, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.4.0";
+import { showVersion } from "./version.js?v=0.4.1";
+import { computeGains, smallCopy } from "./exposure.js?v=0.4.1";
+import { Stitcher } from "./stitcher.js?v=0.4.1";
+import { PanoViewer } from "./viewer.js?v=0.4.1";
+import { loadSessionZip } from "./session-file.js?v=0.4.1";
+import { makeSyntheticSession } from "./synthetic.js?v=0.4.1";
+import { MAX_PHOTO_SIZE, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.4.1";
 
 showVersion();
 
@@ -12,7 +13,8 @@ const SLIDERS = [
   { key: "yawOffsetDeg", label: "Yaw offset", min: -10, max: 10, step: 0.05, unit: "°" },
   { key: "pitchOffsetDeg", label: "Pitch offset", min: -10, max: 10, step: 0.05, unit: "°" },
   { key: "rollOffsetDeg", label: "Roll offset", min: -10, max: 10, step: 0.05, unit: "°" },
-  { key: "feather", label: "Feather width", min: 0.02, max: 1, step: 0.01, unit: "" },
+  { key: "feather", label: "Edge fade", min: 0.02, max: 1, step: 0.01, unit: "" },
+  { key: "sharpness", label: "Blend sharpness (0 = average)", min: 0, max: 60, step: 1, unit: "" },
 ];
 
 const SETTINGS_KEY = "sphere-cam-lab-settings";
@@ -55,6 +57,10 @@ $("use-aligned").addEventListener("change", (e) => {
   settings.useAligned = e.target.checked;
   changed();
 });
+$("match-exposure").addEventListener("change", (e) => {
+  settings.matchExposure = e.target.checked;
+  changed();
+});
 $("tint").addEventListener("change", (e) => {
   settings.tint = e.target.checked;
   changed();
@@ -89,6 +95,7 @@ function showSettings() {
     output.textContent = `${Number(settings[s.key]).toFixed(s.step < 0.1 ? 2 : 1)}${s.unit}`;
   }
   $("use-aligned").checked = settings.useAligned;
+  $("match-exposure").checked = settings.matchExposure;
   $("tint").checked = settings.tint;
   $("output-width").value = String(settings.outputWidth);
 }
@@ -179,6 +186,11 @@ async function loadSynthetic() {
 
 function useSession(data) {
   if (!stitcher) return;
+  // Brightness matching works on small copies, so make them before the full images are freed.
+  for (const shot of data.shots) shot.small = smallCopy(shot.image);
+  const { gains, vignette } = computeGains(data.shots, settings);
+  data.shots.forEach((shot, i) => (shot.gain = gains[i]));
+  data.vignette = vignette;
   stitcher.setPhotos(data.shots);
   // The photos are on the GPU now, so free the decoded copies.
   data.shots.forEach((s) => s.image.close?.());
@@ -211,7 +223,7 @@ function requestStitch() {
 function stitch() {
   const t0 = performance.now();
   try {
-    stitcher.stitch({ ...settings, yaw0Deg: current.session.yaw0Deg ?? 0 }, flatCanvas);
+    stitcher.stitch({ ...settings, vignette: current.vignette, yaw0Deg: current.session.yaw0Deg ?? 0 }, flatCanvas);
   } catch (err) {
     console.error(err);
     $("stitch-info").textContent = err.message;
