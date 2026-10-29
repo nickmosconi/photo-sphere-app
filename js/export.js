@@ -1,4 +1,4 @@
-import { VERSION } from "./version.js?v=0.2.0";
+import { VERSION } from "./version.js?v=0.2.1";
 
 const JSZIP_URL = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
 

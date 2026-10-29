@@ -1,7 +1,7 @@
-import { showVersion, VERSION } from "./version.js?v=0.2.0";
-import * as db from "./db.js?v=0.2.0";
-import { buildSessionZip } from "./export.js?v=0.2.0";
-import { TARGETS } from "./targets.js?v=0.2.0";
+import { showVersion, VERSION } from "./version.js?v=0.2.1";
+import * as db from "./db.js?v=0.2.1";
+import { buildSessionZip } from "./export.js?v=0.2.1";
+import { TARGETS } from "./targets.js?v=0.2.1";
 import {
   angleBetween,
   axisAngle,
@@ -14,7 +14,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.2.0";
+} from "./quat.js?v=0.2.1";
 
 showVersion();
 db.requestPersistentStorage();
