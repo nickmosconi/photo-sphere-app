@@ -1,4 +1,4 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.7.1";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.8.0";
 
 // Refines each photo's orientation so overlapping photos line up (a "rotation bundle
 // adjustment"). The phone's sensors put each photo within a degree or two of where it

@@ -138,8 +138,8 @@ export function depthColors(depth, width, height) {
   return canvas;
 }
 
-// Walk around inside a sphere with depth: drag to look, pinch or scroll to zoom,
-// WASD / arrow keys (or the on-screen stick) to step, Q / E to go down / up.
+// Walk around inside a sphere with depth, or freely through a splat scene: drag to look, pinch or
+// scroll to zoom, WASD / arrow keys (or the on-screen stick) to step, Q / E to go down / up.
 export class WalkViewer {
   constructor(container) {
     this.container = container;
@@ -155,6 +155,8 @@ export class WalkViewer {
     this.camera.rotation.order = "YXZ";
     this.mesh = null; // the sphere's 3D surface
     this.alternate = null; // another surface shown instead (for example the true view)
+    this.splat = null; // a Gaussian splat scene (from a walking video) shown instead of a sphere
+    this.spark = null; // Spark, the splat renderer, loaded the first time a splat is opened
 
     this.yaw = 0; // degrees right of FRONT
     this.pitch = 0; // degrees above the horizon
@@ -212,6 +214,39 @@ export class WalkViewer {
     this.requestRender();
   }
 
+  // Shows a Gaussian splat scene instead of a sphere (or stops showing it when bytes is null).
+  // Spark, the splat library, is only downloaded the first time. In a splat there's no step limit,
+  // and the view redraws every frame because Spark re-sorts the splats as you move.
+  async setSplat(bytes, fileName) {
+    if (this.splat) {
+      this.scene.remove(this.splat);
+      this.splat.dispose();
+      this.splat = null;
+    }
+    if (bytes) {
+      const { SparkRenderer, SplatMesh } = await import("@sparkjsdev/spark");
+      if (!this.spark) {
+        this.spark = new SparkRenderer({ renderer: this.renderer });
+        this.scene.add(this.spark);
+      }
+      const splat = new SplatMesh({ fileBytes: bytes, fileName });
+      await splat.initialized;
+      this.setMesh(null);
+      this.setAlternate(null);
+      this.splat = splat;
+      this.scene.add(splat);
+    }
+    this.renderer.setAnimationLoop(this.splat ? (time) => this.frame(time) : null);
+    this.resetPosition();
+    return this.splat;
+  }
+
+  // Many splat files are stored upside down (camera Y pointing down); this turns them over.
+  setSplatFlipped(flipped) {
+    this.splat?.quaternion.set(flipped ? 1 : 0, 0, 0, flipped ? 0 : 1);
+    this.requestRender();
+  }
+
   get position() {
     return this.camera.position;
   }
@@ -237,7 +272,7 @@ export class WalkViewer {
   }
 
   requestRender() {
-    if (this.pending) return;
+    if (this.pending || this.splat) return; // a splat redraws every frame anyway
     this.pending = true;
     requestAnimationFrame((time) => {
       this.pending = false;
@@ -247,7 +282,7 @@ export class WalkViewer {
 
   frame(time) {
     const dt = this.lastTime ? Math.min(0.1, (time - this.lastTime) / 1000) : 0;
-    this.lastTime = this.moving ? time : 0;
+    this.lastTime = this.moving || this.splat ? time : 0;
     if (dt > 0) this.step(dt);
     this.pitch = Math.max(-89, Math.min(89, this.pitch));
     this.camera.rotation.y = -this.yaw * DEG;
@@ -272,9 +307,10 @@ export class WalkViewer {
     const dist = SPEED * dt;
     p.x += (Math.sin(yaw) * forward + Math.cos(yaw) * right) * dist;
     p.z += (-Math.cos(yaw) * forward + Math.sin(yaw) * right) * dist;
-    p.y = Math.max(-MAX_RISE, Math.min(MAX_RISE, p.y + up * dist));
+    p.y += up * dist;
+    if (!this.splat) p.y = Math.max(-MAX_RISE, Math.min(MAX_RISE, p.y));
     const flat = Math.hypot(p.x, p.z);
-    if (flat > MAX_STEP) {
+    if (flat > MAX_STEP && !this.splat) {
       p.x *= MAX_STEP / flat;
       p.z *= MAX_STEP / flat;
     }

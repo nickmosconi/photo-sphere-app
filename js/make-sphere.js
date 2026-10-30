@@ -1,11 +1,11 @@
-import { grayCopy, refineOrientations } from "./align.js?v=0.7.1";
-import * as db from "./db.js?v=0.7.1";
-import { computeGains, smallCopy } from "./exposure.js?v=0.7.1";
-import { canvasToJpeg, decodeImage, freeImage, imageToJpeg } from "./images.js?v=0.7.1";
-import { JpegEncoder } from "./jpeg-encoder.js?v=0.7.1";
-import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_SIZES, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.7.1";
-import { Stitcher } from "./stitcher.js?v=0.7.1";
-import { addGPanoXmp } from "./xmp.js?v=0.7.1";
+import { grayCopy, refineOrientations } from "./align.js?v=0.8.0";
+import * as db from "./db.js?v=0.8.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.8.0";
+import { canvasToJpeg, decodeImage, freeImage, imageToJpeg } from "./images.js?v=0.8.0";
+import { JpegEncoder } from "./jpeg-encoder.js?v=0.8.0";
+import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_SIZES, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.8.0";
+import { Stitcher } from "./stitcher.js?v=0.8.0";
+import { addGPanoXmp } from "./xmp.js?v=0.8.0";
 
 const JPEG_QUALITY = 0.92;
 const THUMB_WIDTH = 640;

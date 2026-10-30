@@ -1,18 +1,20 @@
-import { showVersion } from "./version.js?v=0.2.0";
-import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.7.1";
-import { EYE, EYE_HEIGHT } from "./room.js?v=0.2.0";
-import { compareDepth, depthFromPng, depthToPng, floorDistance } from "./depth-file.js?v=0.2.0";
-import { buildDepthMesh, depthColors, WalkViewer } from "./walk-viewer.js?v=0.2.0";
+import { showVersion } from "./version.js?v=0.3.0";
+import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.8.0";
+import { EYE, EYE_HEIGHT } from "./room.js?v=0.3.0";
+import { compareDepth, depthFromPng, depthToPng, floorDistance } from "./depth-file.js?v=0.3.0";
+import { buildDepthMesh, depthColors, WalkViewer } from "./walk-viewer.js?v=0.3.0";
 
 showVersion();
 
 const $ = (id) => document.getElementById(id);
 const viewer = new WalkViewer($("viewer"));
 const status = $("status");
+const SPLAT_FILE = /\.(ply|spz|splat|ksplat|sog)$/i;
 
 // What's being shown: a color picture (canvas) and its depth in meters, plus the true depth
 // when it is known (the test room).
 let source = null;
+let loading = 0; // counts loads, so a slow one (the test room) can't replace a newer one
 let colorTexture = null;
 let depthTexture = null;
 
@@ -24,6 +26,7 @@ $("eye-height").addEventListener("change", rebuild);
 $("cut-edges").addEventListener("change", rebuild);
 $("show-depth").addEventListener("change", rebuild);
 $("show-truth").addEventListener("change", updateTruth);
+$("flip-splat").addEventListener("change", () => viewer.setSplatFlipped($("flip-splat").checked));
 $("reset-button").addEventListener("click", () => viewer.resetPosition());
 $("save-room-button").addEventListener("click", saveRoom);
 bindStick();
@@ -31,7 +34,8 @@ bindStick();
 let truthTimer = 0;
 viewer.onMove = (p) => {
   const moved = Math.hypot(p.x, p.y, p.z);
-  status.textContent = moved < 0.005 ? "At the spot where the sphere was taken" : `Stepped ${moved.toFixed(2)} m away`;
+  const start = viewer.splat ? "At the start of the splat" : "At the spot where the sphere was taken";
+  status.textContent = moved < 0.005 ? start : `${viewer.splat ? "Walked" : "Stepped"} ${moved.toFixed(2)} m away`;
   // The true view is drawn for one spot; redraw it once you stop moving.
   if ($("show-truth").checked) {
     clearTimeout(truthTimer);
@@ -44,7 +48,7 @@ loadRoom();
 // Draws the test room in the background (a few seconds on a phone), so the page stays responsive.
 function renderRoomInWorker(options) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./room-worker.js?v=0.2.0", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("./room-worker.js?v=0.3.0", import.meta.url), { type: "module" });
     worker.onmessage = (e) => {
       worker.terminate();
       resolve(e.data);
@@ -58,12 +62,13 @@ function renderRoomInWorker(options) {
 }
 
 async function loadRoom() {
+  const load = ++loading;
   status.textContent = "Drawing the test room…";
   const room = await renderRoomInWorker({ width: 2048, samples: 2 }).catch((err) => {
     status.textContent = err.message;
     return null;
   });
-  if (!room) return;
+  if (!room || load !== loading) return;
   const canvas = toCanvas(room.color, room.width, room.height);
   setSource({
     name: "Test room",
@@ -80,8 +85,12 @@ async function loadRoom() {
 
 // Loads a sphere and its depth map picked together, for example sphere.jpg + sphere.depth.png.
 // A matching *.true-depth.png (from "Download test room") adds an accuracy check.
+// A splat file (from a walking video, e.g. Scaniverse's PLY export) opens on its own.
 async function loadFiles(files) {
+  ++loading;
   $("file-input").value = "";
+  const splatFile = files.find((f) => SPLAT_FILE.test(f.name));
+  if (splatFile) return loadSplat(splatFile);
   const truthFile = files.find((f) => /\.true-depth\.png$/i.test(f.name));
   const depthFile = files.find((f) => f !== truthFile && /depth\.png$/i.test(f.name));
   const colorFile = files.find((f) => f !== truthFile && f !== depthFile);
@@ -109,7 +118,34 @@ async function loadFiles(files) {
   }
 }
 
+async function loadSplat(file) {
+  status.textContent = `Opening ${file.name}…`;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    colorTexture?.dispose();
+    depthTexture?.dispose();
+    source = colorTexture = depthTexture = null;
+    const splat = await viewer.setSplat(bytes, file.name);
+    viewer.setSplatFlipped($("flip-splat").checked);
+    setSplatControls(true);
+    $("source-info").textContent = `${file.name}: ${splat.numSplats.toLocaleString()} splats. Walk anywhere; no step limit.`;
+    $("scale-info").textContent = $("accuracy").textContent = "";
+    status.textContent = "At the start of the splat";
+  } catch (err) {
+    console.error(err);
+    status.textContent = `Couldn't open that splat: ${err.message}`;
+  }
+}
+
+// Depth settings only apply to spheres; the flip only to splats.
+function setSplatControls(splat) {
+  $("flip-splat").disabled = !splat;
+  for (const id of ["eye-height", "cut-edges", "show-depth"]) $(id).disabled = splat;
+}
+
 function setSource(next) {
+  if (viewer.splat) viewer.setSplat(null);
+  setSplatControls(false);
   colorTexture?.dispose();
   depthTexture?.dispose();
   source = next;

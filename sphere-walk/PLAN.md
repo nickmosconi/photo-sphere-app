@@ -145,6 +145,14 @@ Test whether people can just turn the phone around them while the app picks the 
 
 **Watch for:** more blur from fast turning, missed spots straight up and down, and more ghosting if people swing the phone at arm's length.
 
+**Progress (Sphere Cam v0.8.0, Oct 29):** moved up at the owner's request ("too much user input").
+
+- Done: **Sweep without dots** checkbox on the capture start screen (remembered; dots stay the default). The same 30 spots are used but not shown: while the phone turns slower than 12°/s, a photo is taken whenever the camera passes within 8° of a spot, and replaced later if it passes at least 2° closer. A coverage map at the bottom fills in green, with a yellow dot for where the camera points; the hint says "Slow down…" or what's missing ("Tilt up halfway and turn slowly around", "Point straight up at the ceiling"). Stitching is unchanged.
+- Saved: `session.mode` ("sweep" or "dots") and each photo's `offCenterDeg`.
+- Fixed along the way: tapping Done or Cancel while a photo was saving used to be ignored; it now waits for the photo.
+- Tested on the PC with a fake camera and compass (photos taken while turning, stitched into a sphere). Not yet tried on the iPhone: the 8° and 12°/s limits may need tuning.
+- Not done: recording continuous video and picking frames from it. Taking photos at the spots gives the stitcher the same overlap as dot mode; revisit if sweeping still feels like aiming.
+
 **Starter prompt:**
 
 ```
@@ -214,6 +222,17 @@ Capture the same space a second way and compare honestly before refining either.
 3. **Load it in Sphere Walk.** Spark reads the common splat formats (PLY, SPZ and others), so it opens in the same viewer.
 4. **Compare side by side.** Smoothness, sharpness, holes, capture time, processing time and cost.
 5. **Write `sphere-walk/FINDINGS.md`** with the winner, or a mix (for example video splat for the walk, spheres for sharp look-around spots).
+
+**Progress (Sphere Walk v0.3.0, Oct 29):** moved up at the owner's request, to test "just walk with the phone".
+
+- Done: Sphere Walk opens splat files (.ply, .spz, .splat, .ksplat, .sog) through **Open files…**, using [Spark](https://github.com/sparkjsdev/spark) 2.3.1 (MIT, approved by the owner Oct 29). Spark is only downloaded when a splat is opened. Sphere Walk now uses three.js 0.180 (Spark needs it); Sphere Cam's pages keep 0.170. In a splat there is no 1 m step limit, and **Turn the splat upside down** fixes files stored upside down. Tested with Spark's sample splat.
+- Why not motion sensors alone: working out position from the accelerometer drifts by meters within seconds. Position has to come from the video (what ARKit/ARCore do live in a native app, and what splat apps do after recording).
+- **How to make one (iPhone, free):** [Scaniverse](https://scaniverse.com) builds the splat on the phone.
+  1. In Scaniverse, start a new scan and choose Splat.
+  2. Walk slowly through the rooms with the phone at chest height, pointing ahead and a little to each side; keep moving steadily, don't spin in place. A minute or two is plenty for two rooms. Good, even light.
+  3. Let it process on the phone, then Share/Export as **PLY** and save it to Files.
+  4. In Sphere Walk: Settings → **Open files…** → pick the .ply. If the room is upside down, tick **Turn the splat upside down**.
+- Other apps that export splats: Polycam (PLY export needs a paid plan), KIRI Engine, Marble (World Labs) from video.
 
 **Starter prompt:**
 
