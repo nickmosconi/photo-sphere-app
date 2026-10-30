@@ -93,13 +93,13 @@ one real sphere, and tell me which looks better and how long each takes on my PC
   | Licence | Apache-2.0 | CC BY-NC 4.0 |
 
   **DA² wins:** sharper edges (it sees the back room and crate through the test room's doorway, and the living room's hallway and side doorway, which DAP blurs), and it can go in a product. DAP's built-in size guess doesn't matter because the phone height sets the scale anyway. In the viewer, a half-meter sideways step in the living room shows clear parallax with either one.
-- Next: iPhone check of the viewer with the living room (needs a way to get depth files to the phone), then the Stage 1 "done when" checks below.
+- Next: iPhone check of the viewer with the living room. Put `living-room.jpg` and `living-room.da2.depth.png` in the iPhone's Files app (not Photos, which may turn the PNG into a JPEG), open Sphere Walk, tap **Open files… → Choose Files** and select both.
 
 **Done when:**
 
-- [ ] Depth on the synthetic room is close to the true distances
-- [ ] In a real sphere on your iPhone, stepping half a meter sideways makes near objects shift in front of far ones
-- [ ] The floor looks flat and at the right height
+- [x] Depth on the synthetic room is close to the true distances (DA²: typical error 2.3%, 99% of pixels within 10%)
+- [ ] In a real sphere on your iPhone, stepping half a meter sideways makes near objects shift in front of far ones (works in the PC browser; iPhone not checked yet)
+- [x] The floor looks flat and at the right height (living room, DA²: floor 1.51 m down at every distance from 0 to 6 m out, within 2 cm; "right height" is the phone height you type in, 1.5 m unless changed)
 
 ## Stage 2: Capture a path of spheres
 
