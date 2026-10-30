@@ -32,10 +32,16 @@ MAX_MM = 65535
 
 
 def load_da2():
-    sys.path.insert(0, os.path.join(VENDOR, "DA-2", "src"))
     import json
+    import types
 
     from safetensors.torch import load_file
+
+    # Load only the model: DA-2's package start-up also loads its training and 3D-export
+    # helpers, which need libraries the depth tool doesn't use (accelerate, utils3d, ...).
+    package = types.ModuleType("da2")
+    package.__path__ = [os.path.join(VENDOR, "DA-2", "src", "da2")]
+    sys.modules["da2"] = package
     from da2.model.spherevit import SphereViT
 
     with open(os.path.join(VENDOR, "DA-2", "configs", "infer.json")) as f:

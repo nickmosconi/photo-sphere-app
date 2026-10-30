@@ -79,7 +79,21 @@ one real sphere, and tell me which looks better and how long each takes on my PC
 - Depth files are PNGs holding millimeters (red × 256 + green), written by the browser and, later, the Python tool.
 - Spark is not used yet: a mesh in three.js (already allowed) does the job for one sphere. Revisit for Stage 3 or when loading splat files.
 - **Model findings:** ORB's Hugging Face page and GitHub are no longer public. Its open base, [DA²](https://github.com/EnVision-Research/DA-2) (Apache-2.0, 1.4 GB, relative depth), is the stand-in. **DAP's licence is CC BY-NC 4.0 (no commercial use)**, not Apache. Both need Python 3.10 or newer. Small fallback: [DA360](https://github.com/Antigravity-Tech/DA360) (small model about 100 MB).
-- Next: the Python depth tool in `tools/` (needs a newer Python and about 3 GB of downloads).
+- Done: the Python depth tool (`tools/depth.py`, setup in `tools/README.md`), scaling to phone height and saving a depth PNG the viewer opens.
+- **DA² vs DAP (Oct 29, PC processor, 1024 × 512 input):**
+
+  | | DA² | DAP |
+  |---|---|---|
+  | Test room: typical error | 2.3% | 2.4% |
+  | Test room: pixels within 10% | 99% | 93% |
+  | Test room: floor (truth 1.50 m) | 1.47–1.53 m | 1.49–1.51 m |
+  | Size guessed before scaling | none (relative only) | floor 1.59 m (6% off) |
+  | Living room: floor spread | 1.18–1.52 m | 1.29–1.53 m |
+  | Time per sphere | 12–14 s (+ 9–37 s to load) | 10 s (+ 18–21 s to load) |
+  | Licence | Apache-2.0 | CC BY-NC 4.0 |
+
+  **DA² wins:** sharper edges (it sees the back room and crate through the test room's doorway, and the living room's hallway and side doorway, which DAP blurs), and it can go in a product. DAP's built-in size guess doesn't matter because the phone height sets the scale anyway. In the viewer, a half-meter sideways step in the living room shows clear parallax with either one.
+- Next: iPhone check of the viewer with the living room (needs a way to get depth files to the phone), then the Stage 1 "done when" checks below.
 
 **Done when:**
 

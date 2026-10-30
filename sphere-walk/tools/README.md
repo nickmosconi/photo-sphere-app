@@ -13,6 +13,8 @@ Big and downloaded files are kept out of Git (see `.gitignore`): `.venv/`, `mode
 2. PyTorch for the processor, plus helpers:
    `uv pip install --python .venv/Scripts/python.exe --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 torchvision==0.22.1`
    `uv pip install --python .venv/Scripts/python.exe numpy pillow opencv-python-headless einops pyyaml huggingface_hub safetensors timm transformers==4.46.3 omegaconf`
+   DAP's backbone (DINOv3) also needs:
+   `uv pip install --python .venv/Scripts/python.exe torchmetrics==1.8.2 ftfy regex scikit-learn submitit termcolor`
 3. Model code in `vendor/`:
    `git clone --depth 1 https://github.com/EnVision-Research/DA-2.git vendor/DA-2`
    `git clone --depth 1 https://github.com/Insta360-Research-Team/DAP.git vendor/DAP`
@@ -24,6 +26,9 @@ Big and downloaded files are kept out of Git (see `.gitignore`): `.venv/`, `mode
 |---|---|---|
 | DA² | Apache-2.0: fine in a product | Distance along each ray, unknown overall size |
 | DAP | CC BY-NC 4.0: testing only, no commercial use | Meters (trained up to 100 m), plus a sky mask |
+
+DA² is the default: it was the sharper of the two on the test room and a real living room
+(results in `../PLAN.md`, Stage 1 progress). Each takes about 10–14 s per sphere on the PC's processor.
 
 ## Use
 
