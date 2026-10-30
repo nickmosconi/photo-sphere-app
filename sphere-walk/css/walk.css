@@ -1,0 +1,106 @@
+/* Sphere Walk: full-screen 3D view with a settings panel and an on-screen stick.
+   Builds on Sphere Cam's css/style.css. */
+
+body.walk {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.walk-top {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 5;
+}
+
+.walk-top .hint {
+  flex: 1;
+}
+
+.walk-top .ctl {
+  flex: none;
+  padding: 10px 14px;
+}
+
+.walk-panel {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 64px);
+  right: 8px;
+  width: min(320px, calc(100vw - 16px));
+  max-height: calc(100% - env(safe-area-inset-top) - 150px);
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+  border-radius: 12px;
+  background: rgba(16, 20, 24, 0.88);
+  z-index: 6;
+}
+
+.walk-panel h2 {
+  margin: 12px 0 6px;
+  font-size: 1rem;
+}
+
+.walk-panel .field input {
+  width: 5em;
+  margin-left: 8px;
+  font: inherit;
+}
+
+.walk-panel .button-row {
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: 0.85rem;
+  margin: 6px 0;
+}
+
+.file-button {
+  cursor: pointer;
+}
+
+.stick {
+  position: fixed;
+  left: 24px;
+  bottom: calc(env(safe-area-inset-bottom) + 40px);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.3);
+  touch-action: none;
+  z-index: 5;
+}
+
+.stick .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  margin: -25px 0 0 -25px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
+.walk-help {
+  position: fixed;
+  left: 160px;
+  right: 120px;
+  bottom: calc(env(safe-area-inset-bottom) + 4px);
+  margin: 0;
+  font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 4;
+}
+
+@media (max-width: 600px) {
+  .walk-help {
+    display: none;
+  }
+}

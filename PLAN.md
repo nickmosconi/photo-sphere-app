@@ -9,7 +9,7 @@ A web app that recreates Google's old **Photo Sphere** camera: guided capture of
 ## Notes for Claude Code (read first)
 
 - **The owner has no coding experience.** Explain what you're doing in plain language, keep explanations short, and tell them exactly what to tap or click when they need to do something (on the PC, on GitHub, on the iPhone).
-- **The owner codes on a PC (Windows) and tests on an iPhone in Safari.** There is no Mac.
+- **The owner codes on a PC (Windows) and tests on an iPhone in Safari.** The owner is getting a Mac to build and test a native iOS app (Xcode, running on the iPhone, TestFlight). Until it arrives, keep all web work runnable from the PC; once it's here, native iOS work happens on the Mac.
 - **Work one phase at a time.** Finish a phase, deploy it, and stop with a short "what to test on your phone" checklist before starting the next one.
 - **Commit to git after each working step** so we can always roll back.
 - **Keep it simple:** plain HTML, CSS and JavaScript (ES modules), no build step. Allowed libraries: **three.js** (viewer, WebGL helpers) and **JSZip** (export/import). Ask before adding anything else.
@@ -106,7 +106,7 @@ This is the main place to iterate, entirely on the PC.
 ## Phase 6 — Wrap-up and decision
 
 - Write `FINDINGS.md`: best capture pattern, field-of-view values that worked, sensor quirks found, stitcher approach, and what didn't work in the browser.
-- Help the owner decide: keep improving the web app, or move to a native iOS app (Swift, or Expo/React Native) using these findings.
+- Help the owner decide: keep improving the web app, or move to a native iOS app (Swift, or Expo/React Native) using these findings. The owner is getting a Mac, so a native Swift app built and tested in Xcode is a realistic option.
 
 ---
 

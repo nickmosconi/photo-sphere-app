@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sphere Walk</title>
+  <link rel="stylesheet" href="../css/style.css?v=0.7.0">
+  <link rel="stylesheet" href="css/walk.css?v=0.1.0">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+</head>
+<body class="walk">
+  <div id="viewer" class="viewer-full"></div>
+
+  <header class="walk-top">
+    <a class="ctl back" href="../?v=0.7.0">← Sphere Cam</a>
+    <div id="status" class="hint"></div>
+    <button id="panel-button" class="ctl panel-toggle" type="button">Settings</button>
+  </header>
+
+  <aside id="panel" class="walk-panel">
+    <section>
+      <h2>Sphere</h2>
+      <p class="button-row">
+        <button id="room-button" class="small-button" type="button">Test room</button>
+        <label class="small-button file-button">Open files…<input id="file-input" type="file" accept="image/*" multiple hidden></label>
+      </p>
+      <p class="muted small">Open files: pick a sphere JPEG and its depth file (<i>name</i>.depth.png) together.</p>
+      <p id="source-info" class="muted small"></p>
+    </section>
+    <section>
+      <h2>Depth</h2>
+      <label class="field">Phone height above the floor (m)
+        <input id="eye-height" type="number" min="0.5" max="2.5" step="0.05" value="1.5">
+      </label>
+      <p id="scale-info" class="muted small"></p>
+      <label class="check"><input id="cut-edges" type="checkbox" checked> Cut at depth edges</label>
+      <label class="check"><input id="show-depth" type="checkbox"> Show depth as colors</label>
+      <label class="check"><input id="show-truth" type="checkbox"> Show the true view from here (test room)</label>
+      <p id="accuracy" class="muted small"></p>
+    </section>
+    <section>
+      <p class="button-row">
+        <button id="reset-button" class="small-button" type="button">Back to the start</button>
+        <button id="save-room-button" class="small-button" type="button">Download test room</button>
+      </p>
+    </section>
+  </aside>
+
+  <div id="stick" class="stick" aria-label="Move"><div class="knob"></div></div>
+  <p class="walk-help">Drag to look · Stick, WASD or arrow keys to step · Q / E down / up</p>
+
+  <script type="module" src="js/walk.js?v=0.1.0"></script>
+</body>
+</html>
