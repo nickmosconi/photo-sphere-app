@@ -1,0 +1,6 @@
+# Big or generated files stay out of Git: AI models, their code, and depth results.
+.venv/
+models/
+vendor/
+output/
+__pycache__/
