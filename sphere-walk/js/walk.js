@@ -1,5 +1,5 @@
 import { showVersion } from "./version.js?v=0.3.0";
-import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.8.0";
+import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.9.0";
 import { EYE, EYE_HEIGHT } from "./room.js?v=0.3.0";
 import { compareDepth, depthFromPng, depthToPng, floorDistance } from "./depth-file.js?v=0.3.0";
 import { buildDepthMesh, depthColors, WalkViewer } from "./walk-viewer.js?v=0.3.0";

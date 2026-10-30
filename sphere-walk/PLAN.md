@@ -152,6 +152,7 @@ Test whether people can just turn the phone around them while the app picks the 
 - Fixed along the way: tapping Done or Cancel while a photo was saving used to be ignored; it now waits for the photo.
 - Tested on the PC with a fake camera and compass (photos taken while turning, stitched into a sphere). Not yet tried on the iPhone: the 8° and 12°/s limits may need tuning.
 - Not done: recording continuous video and picking frames from it. Taking photos at the spots gives the stitcher the same overlap as dot mode; revisit if sweeping still feels like aiming.
+- **Removed in Sphere Cam v0.9.0 (Oct 30)** after the owner tried it: "Go back to the dot mode." Dots are the only capture mode again (the code is in Git history, commit d901899). Kept: Done/Cancel wait for a photo that's still saving.
 
 **Starter prompt:**
 

@@ -135,3 +135,14 @@ Tested on the PC: two strips match one pass (mean difference 0.001 out of 255); 
 | Light sharpening | Unsharp mask over each 3×3 neighborhood when finishing the sphere; strength 0.6 (1.2 looked gritty). Adjustable in the Lab. | Visibly crisper brush marks |
 
 Still unverified on the iPhone: time to make an 8192 sphere (the PC needs about a minute; saving each 2048 copy was slow in the PC test browser) and whether it stays within memory.
+
+### v0.9.0 (2026-10-30): seam finding
+
+The owner reported "still a lot of blurriness and smudging". Close-ups of the Oct 28 living room showed why: near objects (TV, the paper on its stand, ceiling fan, fireplace mantel, door edge, wall socket) sit 2–3° apart in neighboring photos because the phone moves between shots, not just turns (parallax). Blending overlaps turned that into soft see-through doubles; sharper blending turned it into duplicated objects and brightness patches.
+
+| Change | Details | Tested on the PC |
+|---|---|---|
+| Seam finding (js/seams.js) | On a 512 × 256 map of the sphere, each spot is given to one photo by a graph cut (alpha-expansion, 2 rounds, Dinic max-flow): prefer each photo's middle, and place joins where neighboring photos agree. Each photo gets a soft mask (joins blend over about 1.5°), which the stitcher reads at full size. On by default; a Lab checkbox turns it off. About 8 MB more memory. | Fan blades, fireplace mantel, wall socket, door edge and the paper on the TV stand now appear once and sharp. Make sphere at 8192: 77 s on the PC (was 62 s); the joins themselves take about 4 s. Map at 1024 × 512 looked the same but took about 20 s. |
+| Removed sweep (no dots) mode | The owner went back to dots | Dot capture checked with a fake camera |
+
+Limits: where two photos disagree by more than the overlap allows (the TV's left edge, seen from the eye-level and the tilted-up row after the phone moved a lot), any join crosses the difference, so it shows as a hard edge instead of a smudge. Only shooting technique fixes that (turn the phone around its camera; keep near things 2 steps away), or depth-aware stitching later.

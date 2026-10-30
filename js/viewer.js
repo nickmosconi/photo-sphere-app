@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { cameraDirection, fromDeviceOrientation, yawPitchFromDirection } from "./quat.js?v=0.8.0";
+import { cameraDirection, fromDeviceOrientation, yawPitchFromDirection } from "./quat.js?v=0.9.0";
 
 const DEG = Math.PI / 180;
 

@@ -1,5 +1,5 @@
-import { loadJSZip } from "./jszip.js?v=0.8.0";
-import { VERSION } from "./version.js?v=0.8.0";
+import { loadJSZip } from "./jszip.js?v=0.9.0";
+import { VERSION } from "./version.js?v=0.9.0";
 
 // Describes the numbers in session.json, for the Stitch Lab and for anyone reading the file.
 const CONVENTIONS = {

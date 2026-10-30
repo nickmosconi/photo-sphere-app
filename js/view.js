@@ -1,6 +1,6 @@
-import { showVersion, VERSION } from "./version.js?v=0.8.0";
-import * as db from "./db.js?v=0.8.0";
-import { PanoViewer } from "./viewer.js?v=0.8.0";
+import { showVersion, VERSION } from "./version.js?v=0.9.0";
+import * as db from "./db.js?v=0.9.0";
+import { PanoViewer } from "./viewer.js?v=0.9.0";
 
 showVersion();
 

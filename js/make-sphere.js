@@ -1,11 +1,12 @@
-import { grayCopy, refineOrientations } from "./align.js?v=0.8.0";
-import * as db from "./db.js?v=0.8.0";
-import { computeGains, smallCopy } from "./exposure.js?v=0.8.0";
-import { canvasToJpeg, decodeImage, freeImage, imageToJpeg } from "./images.js?v=0.8.0";
-import { JpegEncoder } from "./jpeg-encoder.js?v=0.8.0";
-import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_SIZES, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.8.0";
-import { Stitcher } from "./stitcher.js?v=0.8.0";
-import { addGPanoXmp } from "./xmp.js?v=0.8.0";
+import { grayCopy, refineOrientations } from "./align.js?v=0.9.0";
+import * as db from "./db.js?v=0.9.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.9.0";
+import { canvasToJpeg, decodeImage, freeImage, imageToJpeg } from "./images.js?v=0.9.0";
+import { JpegEncoder } from "./jpeg-encoder.js?v=0.9.0";
+import { findSeams } from "./seams.js?v=0.9.0";
+import { MAX_PHOTO_SIZE, photoOrientation, SPHERE_SIZES, STITCH_DEFAULTS } from "./stitch-settings.js?v=0.9.0";
+import { Stitcher } from "./stitcher.js?v=0.9.0";
+import { addGPanoXmp } from "./xmp.js?v=0.9.0";
 
 const JPEG_QUALITY = 0.92;
 const THUMB_WIDTH = 640;
@@ -48,7 +49,7 @@ export async function makeSphere(sessionId, onProgress, sizes = sizesForThisPhon
       onProgress?.((0.4 * i) / n, `Reading photo ${i + 1} of ${n}…`);
       note(`reading photo ${i + 1} of ${n}`);
       const image = await decodeImage(shot.blob, MAX_PHOTO_SIZE, shot);
-      if (settings.refine) shot.gray = grayCopy(image);
+      if (settings.refine || settings.seams) shot.gray = grayCopy(image);
       shot.small = smallCopy(image);
       shot.stitchBlob = await imageToJpeg(image, 0.95);
       freeImage(image);
@@ -59,10 +60,7 @@ export async function makeSphere(sessionId, onProgress, sizes = sizesForThisPhon
       const aligned = await refineOrientations(start, settings, (round, rounds) =>
         onProgress?.(0.4 + (0.1 * round) / rounds, "Lining up photos…"),
       );
-      shots.forEach((shot, i) => {
-        shot.quaternionRefined = aligned.quaternions[i];
-        shot.gray = null;
-      });
+      shots.forEach((shot, i) => (shot.quaternionRefined = aligned.quaternions[i]));
       settings.alignment = { matches: aligned.matches, beforeDeg: aligned.beforeDeg, afterDeg: aligned.afterDeg };
     }
     if (settings.matchExposure) {
@@ -70,7 +68,15 @@ export async function makeSphere(sessionId, onProgress, sizes = sizesForThisPhon
       shots.forEach((shot, i) => (shot.gain = gains[i]));
       settings.vignette = vignette;
     }
-    shots.forEach((shot) => (shot.small = null));
+    if (settings.seams) {
+      note("placing the joins");
+      const seams = await findSeams(shots, settings, (f) => onProgress?.(0.5 + 0.05 * f, "Placing the joins between photos…"));
+      shots.forEach((shot, i) => (shot.seamMask = seams.masks[i]));
+    }
+    shots.forEach((shot) => {
+      shot.small = null;
+      shot.gray = null;
+    });
 
     // Second pass: stitch the full photos, one at a time, at the largest size the phone manages.
     let result = null;
@@ -78,7 +84,7 @@ export async function makeSphere(sessionId, onProgress, sizes = sizesForThisPhon
       try {
         result = await stitchAndEncode(shots, { ...settings, outputWidth: size.width }, size, (i, strip) => {
           const part = size.strips > 1 ? ` (part ${strip + 1} of ${size.strips})` : "";
-          onProgress?.(0.5 + (0.5 * (strip + i / n)) / size.strips, `${k === 0 ? "Adding" : "Trying a smaller size: adding"} photo ${i + 1} of ${n}${part}…`);
+          onProgress?.(0.55 + (0.45 * (strip + i / n)) / size.strips, `${k === 0 ? "Adding" : "Trying a smaller size: adding"} photo ${i + 1} of ${n}${part}…`);
           note(`stitching at ${size.width} wide${part}, photo ${i + 1} of ${n}`, size.width);
         });
         break;

@@ -1,12 +1,12 @@
 import { showVersion } from "./version.js?v=0.3.0";
-import * as db from "../../js/db.js?v=0.8.0";
-import { compassPoint } from "../../js/quat.js?v=0.8.0";
-import { TARGETS } from "../../js/targets.js?v=0.8.0";
+import * as db from "../../js/db.js?v=0.9.0";
+import { compassPoint } from "../../js/quat.js?v=0.9.0";
+import { TARGETS } from "../../js/targets.js?v=0.9.0";
 
 showVersion();
 
 const $ = (id) => document.getElementById(id);
-const captureUrl = (pathId) => `../capture.html?path=${pathId}&v=0.8.0`;
+const captureUrl = (pathId) => `../capture.html?path=${pathId}&v=0.9.0`;
 
 $("new-path").addEventListener("click", () => (location.href = captureUrl(crypto.randomUUID())));
 

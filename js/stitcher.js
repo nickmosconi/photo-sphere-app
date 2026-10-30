@@ -1,5 +1,6 @@
-import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.8.0";
-import { photoOrientation } from "./stitch-settings.js?v=0.8.0";
+import { axisAngle, multiply, toMatrix3 } from "./quat.js?v=0.9.0";
+import { MAP_H, MAP_W } from "./seams.js?v=0.9.0";
+import { photoOrientation } from "./stitch-settings.js?v=0.9.0";
 
 // Stitcher v1 (orientation-based). Makes an equirectangular panorama with WebGL 2:
 // for every output pixel, work out its viewing direction, turn it into each photo's camera frame
@@ -11,6 +12,8 @@ import { photoOrientation } from "./stitch-settings.js?v=0.8.0";
 // and read back pixel by pixel instead, which is slower.
 // On phones a big sphere can be made in horizontal strips: the buffers then only need to be one
 // strip tall, which divides the biggest memory cost by the number of strips.
+
+const SEAM_FEATHER = 0.05; // with seams: fade only this close to a photo's edge (0..1, as uFeather)
 
 const VERT = `#version 300 es
 uniform vec2 uUvOffset; // which part of the panorama this pass covers (a strip, or all of it)
@@ -36,6 +39,8 @@ uniform float uSharpness; // 0 = average overlapping photos; higher = favor the 
 uniform vec3 uGain;     // brightness/color correction for this photo
 uniform vec3 uVignette; // how much to brighten toward the corners (lens vignetting)
 uniform vec4 uTint;     // rgb + amount, to show which photo is where
+uniform sampler2D uMask; // seam finding: how much of this photo to use at each spot (seams.js)
+uniform bool uUseMask;
 out vec4 outColor;
 const float PI = 3.14159265358979;
 void main() {
@@ -52,7 +57,10 @@ void main() {
   // exp(−sharpness × angle) lets the nearest photo win, so small misalignments show up as
   // a slight step at a seam instead of a see-through double image.
   float angle = acos(clamp(-v.z / length(v), -1.0, 1.0)) / atan(0.5 * min(uSize.x, uSize.y) / uFocal);
-  float w = max(edgeFade * exp(-uSharpness * angle), 1e-6);
+  float near = exp(-uSharpness * angle);
+  // With seams, each spot comes from the photo chosen for it; the tiny nearest-photo term only
+  // fills spots no photo was chosen for.
+  float w = max(edgeFade * (uUseMask ? texture(uMask, vUv).r + 1e-3 * near : near), 1e-6);
   vec3 c = texture(uPhoto, vec2(uv.x, 1.0 - uv.y)).rgb; // image rows run top to bottom
   float r2 = dot(uv - 0.5, uv - 0.5) * 2.0; // 0 at the center, 1 in the corners
   c *= uGain * exp(uVignette * r2);
@@ -117,7 +125,7 @@ export class Stitcher {
   // photos: [{ image, quaternion, quaternionAligned?, quaternionRefined?, gain? }]. Images are copied to the GPU,
   // so the caller can free them afterwards.
   setPhotos(photos) {
-    this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
+    this.photos.forEach((p) => this.#free(p));
     this.photos = photos.map((p) => this.#upload(p));
   }
 
@@ -154,7 +162,7 @@ export class Stitcher {
         const photo = this.#upload({ ...meta, image });
         freeImage?.(image);
         this.#drawPhoto(photo, i, photos.length, settings);
-        this.gl.deleteTexture(photo.texture);
+        this.#free(photo);
       }
       this.#finish(target, (strip * this.fullHeight) / strips);
     }
@@ -170,8 +178,21 @@ export class Stitcher {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    let mask = null;
+    if (p.seamMask) {
+      mask = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, mask);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, MAP_W, MAP_H, 0, gl.RED, gl.UNSIGNED_BYTE, p.seamMask);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); // the panorama wraps around
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
     return {
       texture,
+      mask,
+      seamless: p.seamMask === null, // seam finding didn't use this photo anywhere
       width: p.image.width,
       height: p.image.height,
       quaternion: p.quaternion,
@@ -179,6 +200,11 @@ export class Stitcher {
       quaternionRefined: p.quaternionRefined,
       gain: p.gain ?? [1, 1, 1],
     };
+  }
+
+  #free(photo) {
+    this.gl.deleteTexture(photo.texture);
+    this.gl.deleteTexture(photo.mask);
   }
 
   // Starts a pass over one strip (of `strips`) of the panorama.
@@ -213,7 +239,14 @@ export class Stitcher {
     gl.uniform2fv(p.uniforms.uUvOffset, this.uvOffset);
     gl.uniform2fv(p.uniforms.uUvScale, this.uvScale);
     gl.uniform1f(p.uniforms.uYaw0, ((settings.yaw0Deg ?? 0) * Math.PI) / 180);
-    gl.uniform1f(p.uniforms.uFeather, settings.feather);
+    // With seams, joins are placed by seams.js, away from photo edges; only the very edge fades.
+    const seams = settings.seams && (photo.mask || photo.seamless);
+    if (seams && !photo.mask) return; // not chosen anywhere
+    gl.uniform1f(p.uniforms.uFeather, seams ? SEAM_FEATHER : settings.feather);
+    gl.uniform1i(p.uniforms.uUseMask, seams ? 1 : 0);
+    gl.uniform1i(p.uniforms.uMask, 1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, seams ? photo.mask : null);
     gl.uniform1f(p.uniforms.uSharpness, settings.sharpness ?? 0);
     gl.uniform3fv(p.uniforms.uGain, settings.matchExposure ? photo.gain : [1, 1, 1]);
     gl.uniform3fv(p.uniforms.uVignette, (settings.matchExposure && settings.vignette) || [0, 0, 0]);
@@ -329,7 +362,7 @@ export class Stitcher {
 
   // Frees everything, including the WebGL context (phones only allow a few at once).
   dispose() {
-    this.photos.forEach((p) => this.gl.deleteTexture(p.texture));
+    this.photos.forEach((p) => this.#free(p));
     this.photos = [];
     this.#freeBuffers();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();

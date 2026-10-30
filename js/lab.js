@@ -1,11 +1,12 @@
-import { showVersion } from "./version.js?v=0.8.0";
-import { grayCopy, refineOrientations } from "./align.js?v=0.8.0";
-import { computeGains, smallCopy } from "./exposure.js?v=0.8.0";
-import { Stitcher } from "./stitcher.js?v=0.8.0";
-import { PanoViewer } from "./viewer.js?v=0.8.0";
-import { loadSessionZip } from "./session-file.js?v=0.8.0";
-import { makeSyntheticSession } from "./synthetic.js?v=0.8.0";
-import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.8.0";
+import { showVersion } from "./version.js?v=0.9.0";
+import { grayCopy, refineOrientations } from "./align.js?v=0.9.0";
+import { computeGains, smallCopy } from "./exposure.js?v=0.9.0";
+import { findSeams } from "./seams.js?v=0.9.0";
+import { Stitcher } from "./stitcher.js?v=0.9.0";
+import { PanoViewer } from "./viewer.js?v=0.9.0";
+import { loadSessionZip } from "./session-file.js?v=0.9.0";
+import { makeSyntheticSession } from "./synthetic.js?v=0.9.0";
+import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.9.0";
 
 showVersion();
 
@@ -71,6 +72,10 @@ $("match-exposure").addEventListener("change", (e) => {
   settings.matchExposure = e.target.checked;
   changed();
 });
+$("seams").addEventListener("change", (e) => {
+  settings.seams = e.target.checked;
+  changed();
+});
 $("tint").addEventListener("change", (e) => {
   settings.tint = e.target.checked;
   changed();
@@ -107,6 +112,7 @@ function showSettings() {
   $("use-aligned").checked = settings.useAligned;
   $("refine").checked = settings.refine;
   $("match-exposure").checked = settings.matchExposure;
+  $("seams").checked = settings.seams;
   $("tint").checked = settings.tint;
   $("output-width").value = String(settings.outputWidth);
 }
@@ -207,13 +213,20 @@ async function useSession(data) {
   const aligned = await refineOrientations(start, settings, (round, rounds) =>
     setInfo(`Lining up photos… round ${round + 1} of ${rounds}`),
   );
-  data.shots.forEach((shot, i) => {
-    shot.quaternionRefined = aligned.quaternions[i];
-    shot.gray = null;
-  });
+  data.shots.forEach((shot, i) => (shot.quaternionRefined = aligned.quaternions[i]));
   const { gains, vignette } = computeGains(data.shots, { ...settings, refine: true });
   data.shots.forEach((shot, i) => (shot.gain = gains[i]));
   data.vignette = vignette;
+  // Joins are worked out once here, with the settings at load time; the checkbox turns them on or off.
+  const seams = await findSeams(
+    data.shots,
+    { ...settings, refine: true, vignette, yaw0Deg: data.session.yaw0Deg ?? 0 },
+    (f) => setInfo(`Placing the joins… ${Math.round(f * 100)}%`),
+  );
+  data.shots.forEach((shot, i) => {
+    shot.seamMask = seams.masks[i];
+    shot.gray = null;
+  });
   stitcher.setPhotos(data.shots);
   // The photos are on the GPU now, so free the decoded copies.
   data.shots.forEach((s) => s.image.close?.());

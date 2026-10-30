@@ -1,9 +1,9 @@
-import { showVersion, VERSION } from "./version.js?v=0.8.0";
-import * as db from "./db.js?v=0.8.0";
-import { buildSessionZip } from "./export.js?v=0.8.0";
-import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.8.0";
-import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.8.0";
-import { TARGETS } from "./targets.js?v=0.8.0";
+import { showVersion, VERSION } from "./version.js?v=0.9.0";
+import * as db from "./db.js?v=0.9.0";
+import { buildSessionZip } from "./export.js?v=0.9.0";
+import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.9.0";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.9.0";
+import { TARGETS } from "./targets.js?v=0.9.0";
 import {
   angleBetween,
   axisAngle,
@@ -17,7 +17,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.8.0";
+} from "./quat.js?v=0.9.0";
 
 showVersion();
 db.requestPersistentStorage();
@@ -28,10 +28,6 @@ const FOV_LONG_DEG = STITCH_DEFAULTS.fovLongDeg;
 const CAPTURE_ANGLE_DEG = 3.5; // how close a dot must be to the ring's center
 const STEADY_MS = 300; // how long the phone must be held still before a photo
 const STEADY_DEG = 0.8; // how much movement still counts as "still"
-const SWEEP_ANGLE_DEG = 8; // sweep mode: how close to a spot a photo must be taken
-const SWEEP_BETTER_DEG = 2; // sweep mode: a new photo replaces one this much farther from its spot
-const SWEEP_MAX_SPEED = 12; // sweep mode: degrees per second; turning faster blurs the photos
-const SWEEP_KEY = "sphere-cam-sweep"; // remembers the "Sweep without dots" choice
 const JPEG_QUALITY = 0.9;
 const BURST_FRAMES = 4; // frames compared for each photo; the sharpest is kept
 const SHARPNESS_PATCH = 384; // size of the middle patch used to judge sharpness
@@ -75,8 +71,6 @@ let nearestAngle = Infinity;
 let anchor = null; // { dir, t }: where the phone was when it last stopped moving
 let ringSince = null;
 let holdProgress = 0;
-let sweepLast = null; // sweep mode: { dir, t } at the previous reading
-let sweepSpeed = 0; // sweep mode: how fast the phone is turning, degrees per second
 
 let pathCount = 0; // path mode: index the next sphere gets
 let pendingWalk = null; // path mode: the walk recorded for the sphere about to be captured
@@ -99,23 +93,6 @@ $("share-button").addEventListener("click", shareExport);
 $("walk-fewer").addEventListener("click", () => setWalkSteps(walkSteps - 1));
 $("walk-more").addEventListener("click", () => setWalkSteps(walkSteps + 1));
 $("walk-next").addEventListener("click", captureNextOnPath);
-$("sweep-mode").checked = readSweepChoice();
-$("sweep-mode").addEventListener("change", () => {
-  try {
-    localStorage.setItem(SWEEP_KEY, $("sweep-mode").checked ? "1" : "");
-  } catch {
-    // Storage blocked: the choice just isn't remembered.
-  }
-});
-
-function readSweepChoice() {
-  try {
-    return localStorage.getItem(SWEEP_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 if (PATH_ID) {
   document.querySelector("#start-screen h1").textContent = "Capture a path";
   document.querySelector("#start-screen .tip").textContent =
@@ -234,8 +211,6 @@ async function beginCapture(existing) {
     compassMean = new CircularMean();
     anchor = null;
     ringSince = null;
-    sweepLast = null;
-    sweepSpeed = 0;
     await saveSession();
 
     capturing = true;
@@ -275,7 +250,6 @@ function newSession() {
     },
     yaw0Deg: null, // camera yaw when the capture started; targets are placed relative to it
     compassOffsetDeg: null, // average (camera yaw − compass heading) during segment 0
-    mode: $("sweep-mode").checked ? "sweep" : "dots", // sweep: no dots, photos taken while turning
     targetCount: TARGETS.length,
     shotCount: 0,
     segments: [],
@@ -319,8 +293,8 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// A photo may be saving when Done or Cancel is tapped (often in sweep mode, where photos keep being
-// taken). Pause taking new ones and wait for it, rather than ignoring the tap.
+// A photo may be saving when Done or Cancel is tapped. Pause taking new ones and wait for it,
+// rather than ignoring the tap.
 async function stopTakingPhotos() {
   stopping = true;
   while (busy) await new Promise((resolve) => setTimeout(resolve, 50));
@@ -595,10 +569,6 @@ function updateAim(now) {
     ringSince = null;
     return;
   }
-  if (session.mode === "sweep") {
-    updateSweep(now);
-    return;
-  }
   for (const t of TARGETS) {
     if (done.has(t.id)) continue;
     const a = angleBetween(camDir, targetDir(t));
@@ -618,34 +588,7 @@ function updateAim(now) {
   if (held >= STEADY_MS) takePhoto(nearest);
 }
 
-// Sweep mode (no dots): the same spots are used, but unseen. While the phone turns slowly, a photo
-// is taken whenever the camera passes near a spot, and replaced if it later passes closer.
-function updateSweep(now) {
-  if (sweepLast) {
-    const dt = (now - sweepLast.t) / 1000;
-    if (dt > 0) sweepSpeed = 0.8 * sweepSpeed + 0.2 * (angleBetween(camDir, sweepLast.dir) / dt);
-  }
-  sweepLast = { dir: camDir, t: now };
-  let best = null;
-  let bestAngle = Infinity;
-  for (const t of TARGETS) {
-    const a = angleBetween(camDir, targetDir(t));
-    const shot = done.get(t.id);
-    if (!shot && a < nearestAngle) {
-      nearestAngle = a;
-      nearest = t;
-    }
-    const limit = shot ? (shot.offCenterDeg ?? 0) - SWEEP_BETTER_DEG : SWEEP_ANGLE_DEG;
-    if (a < limit && a < bestAngle) {
-      best = t;
-      bestAngle = a;
-    }
-  }
-  if (best && sweepSpeed <= SWEEP_MAX_SPEED) takePhoto(best);
-}
-
 async function takePhoto(target) {
-  const replacing = done.get(target.id); // sweep mode: a closer photo of the same spot
   busy = true;
   holdProgress = 0;
   ringSince = null;
@@ -673,10 +616,8 @@ async function takePhoto(target) {
         timestamp = Date.now();
       }
     }
-    if (!replacing) {
-      flash();
-      haptic();
-    }
+    flash();
+    haptic();
     const blob = await new Promise((resolve, reject) =>
       frameCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("JPEG_FAILED"))), "image/jpeg", JPEG_QUALITY),
     );
@@ -699,7 +640,6 @@ async function takePhoto(target) {
       blob,
     };
     shot.id = await db.addShot(shot);
-    if (replacing) await db.deleteShot(replacing.id);
     delete shot.blob;
     done.set(target.id, shot);
     await saveSession();
@@ -800,14 +740,6 @@ function render() {
   ctx.clearRect(0, 0, view.w, view.h);
 
   const ready = q && targetsReady();
-  if (session.mode === "sweep") {
-    if (ready) drawSweepMap();
-    drawCrosshair();
-    $("progress").textContent = `${done.size} / ${TARGETS.length}`;
-    $("undo-button").disabled = done.size === 0;
-    setText($("hint"), hintText(ready));
-    return;
-  }
   if (ready) {
     for (const t of TARGETS) {
       const p = project(targetDir(t));
@@ -842,45 +774,6 @@ function render() {
   $("progress").textContent = `${done.size} / ${TARGETS.length}`;
   $("undo-button").disabled = done.size === 0;
   setText($("hint"), hintText(ready));
-}
-
-// Sweep mode: a map of the whole sphere (all the way around left to right, straight up at the
-// top), with each spot gray until it has a photo and a yellow dot where the camera points.
-function drawSweepMap() {
-  const w = Math.min(300, view.w - 32);
-  const h = w / 2;
-  const x0 = (view.w - w) / 2;
-  const y0 = view.h - h - 120; // above the buttons
-  const yaw0 = session.yaw0Deg + segment.yawShiftDeg;
-  const toMap = (yaw, pitch) => ({ x: x0 + (wrapDeg(yaw) / 360 + 0.5) * w, y: y0 + (0.5 - pitch / 180) * h });
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-  ctx.fillRect(x0 - 6, y0 - 6, w + 12, h + 12);
-  for (const t of TARGETS) {
-    ctx.fillStyle = done.has(t.id) ? "#4cd964" : "rgba(255, 255, 255, 0.3)";
-    if (Math.abs(t.pitch) === 90) {
-      ctx.fillRect(x0, t.pitch > 0 ? y0 : y0 + h - 8, w, 8); // straight up / down: the whole top / bottom edge
-      continue;
-    }
-    const p = toMap(t.yaw, t.pitch);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, h / 11, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const { yaw, pitch } = yawPitchFromDirection(camDir);
-  drawDot(toMap(yaw - yaw0, pitch), 6, "#ffd84d");
-}
-
-function drawCrosshair() {
-  const cx = view.w / 2;
-  const cy = view.h / 2;
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-  ctx.beginPath();
-  ctx.moveTo(cx - 12, cy);
-  ctx.lineTo(cx + 12, cy);
-  ctx.moveTo(cx, cy - 12);
-  ctx.lineTo(cx, cy + 12);
-  ctx.stroke();
 }
 
 function drawDot(p, radius, color) {
@@ -929,23 +822,10 @@ function hintText(ready) {
   if (!isPortrait()) return "Hold the phone upright (portrait).";
   if (!ready) return "Hold the phone upright for a moment…";
   if (done.size === TARGETS.length) return "All photos taken. Tap Done.";
-  if (session.mode === "sweep") {
-    if (sweepSpeed > SWEEP_MAX_SPEED) return "Slow down…";
-    return SWEEP_HINTS[nearest?.id.replace(/\d+$/, "")] ?? "";
-  }
   if (busy) return "Saving…";
   if (holdProgress > 0) return "Hold still…";
   return "Move the ring onto the yellow dot.";
 }
-
-// Sweep mode: what to do next, by the nearest spot still missing (its id without the number).
-const SWEEP_HINTS = {
-  h: "Turn slowly all around at eye level.",
-  u: "Tilt up halfway and turn slowly around.",
-  d: "Tilt down halfway and turn slowly around.",
-  up: "Point straight up at the ceiling.",
-  down: "Point straight down at the floor.",
-};
 
 function setText(el, text) {
   if (el.textContent !== text) el.textContent = text;

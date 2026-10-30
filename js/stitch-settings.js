@@ -15,6 +15,7 @@ export const STITCH_DEFAULTS = {
   outputWidth: 4096,
   useAligned: true,
   refine: true, // line photos up using their content (align.js)
+  seams: true, // take each spot from one photo, with joins where photos agree (seams.js)
   tint: false,
 };
 
