@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sphere Cam · Capture</title>
-  <link rel="stylesheet" href="css/style.css?v=0.7.0">
+  <link rel="stylesheet" href="css/style.css?v=0.7.1">
 </head>
 <body class="capture">
   <video id="camera" playsinline muted autoplay></video>
@@ -58,7 +58,7 @@
       <p id="start-error" class="error"></p>
       <h2>Saved captures</h2>
       <ul id="session-list" class="session-list"></ul>
-      <p><a href="./?v=0.7.0">← Home</a></p>
+      <p><a id="start-back" href="./?v=0.7.1">← Home</a></p>
     </div>
   </section>
 
@@ -71,7 +71,29 @@
       <p><button id="finished-retry" class="small-button" type="button" hidden>Try again</button></p>
       <p><button id="finished-export" class="text-button" type="button">Export photos (.zip)</button></p>
       <p><button id="finished-back" class="text-button" type="button">Back to captures</button></p>
-      <p><a href="./?v=0.7.0">← Home</a></p>
+      <p><a href="./?v=0.7.1">← Home</a></p>
+    </div>
+  </section>
+
+  <!-- Path mode only (opened from Sphere Walk): between two spheres of a path. -->
+  <section id="walk-screen" class="screen" hidden>
+    <div class="screen-inner">
+      <h1>Walk to the next spot</h1>
+      <p id="walk-saved"></p>
+      <ol class="walk-list">
+        <li>Hold the phone upright, camera facing the way you're going.</li>
+        <li>Take <b id="walk-steps-text">3</b> normal steps that way, still facing forward.</li>
+        <li>Tap <b>Capture next sphere</b>.</li>
+      </ol>
+      <p id="walk-heading" class="walk-heading">Compass: waiting…</p>
+      <div class="stepper">
+        <span>Steps taken</span>
+        <button id="walk-fewer" class="small-button" type="button" aria-label="Fewer steps">−</button>
+        <b id="walk-steps">3</b>
+        <button id="walk-more" class="small-button" type="button" aria-label="More steps">+</button>
+      </div>
+      <button id="walk-next" class="big-button" type="button">Capture next sphere</button>
+      <p><a id="walk-finish" class="text-button" href="sphere-walk/paths.html?v=0.2.0">Finish path</a></p>
     </div>
   </section>
 
@@ -85,6 +107,6 @@
     </div>
   </section>
 
-  <script type="module" src="js/capture.js?v=0.7.0"></script>
+  <script type="module" src="js/capture.js?v=0.7.1"></script>
 </body>
 </html>

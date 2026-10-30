@@ -98,7 +98,7 @@ one real sphere, and tell me which looks better and how long each takes on my PC
 **Done when:**
 
 - [x] Depth on the synthetic room is close to the true distances (DA²: typical error 2.3%, 99% of pixels within 10%)
-- [ ] In a real sphere on your iPhone, stepping half a meter sideways makes near objects shift in front of far ones (works in the PC browser; iPhone not checked yet)
+- [x] In a real sphere on your iPhone, stepping half a meter sideways makes near objects shift in front of far ones (living room, checked by you Oct 29)
 - [x] The floor looks flat and at the right height (living room, DA²: floor 1.51 m down at every distance from 0 to 6 m out, within 2 cm; "right height" is the phone height you type in, 1.5 m unless changed)
 
 ## Stage 2: Capture a path of spheres
@@ -109,6 +109,14 @@ Capture several spheres a few steps apart and work out where each one was taken.
 2. **Rough placement.** A top-down map shows each sphere as a dot placed from steps and heading; you can drag a dot to fix it.
 3. **Automatic refinement.** Line up neighboring spheres by matching their 3D points where they overlap, the same idea as Sphere Cam's photo alignment but in 3D.
 4. **One shared floor.** Put every sphere at the same eye height above one floor so walking doesn't bob up and down.
+
+**Progress (v0.2.0 / Sphere Cam v0.7.1, Oct 29):**
+
+- Done: path mode. Sphere Walk → Settings → **Capture a path of spheres** opens the Paths page; **New path** opens Sphere Cam's capture page in path mode (`capture.html?path=<id>`). After each sphere a walk screen says to face the way you're going and take 3 steps (adjustable), shows the live compass, and records both when you tap **Capture next sphere**. Spheres aren't stitched during a path; make them later with **Make sphere** in the capture list.
+- Saved with each capture (and in its exported `session.json`): `path: { id, index, steps, headingDeg, headingAccuracyDeg }`, where steps and heading describe the walk from the previous sphere. Each sphere's own compass offset (`compassOffsetDeg`) is already saved, so spheres can be turned to face north on the map.
+- Normal Sphere Cam capture is unchanged; path spheres show as "Path sphere N" in its list.
+- Kept deliberately simple: this web version is the prototype for a future native iOS/Android app, where ARKit/ARCore will track position directly.
+- Next: the top-down map (step 2).
 
 **Starter prompt:**
 

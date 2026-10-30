@@ -668,3 +668,32 @@ body.lab {
   pointer-events: none;
   z-index: 1000;
 }
+
+/* Path mode (Sphere Walk): walking between spheres. */
+.walk-list {
+  margin: 16px 0;
+  padding-left: 24px;
+  text-align: left;
+}
+
+.walk-list li + li {
+  margin-top: 6px;
+}
+
+.walk-heading {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+.stepper b {
+  min-width: 2ch;
+  font-size: 1.4rem;
+}

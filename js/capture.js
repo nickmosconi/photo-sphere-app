@@ -1,14 +1,15 @@
-import { showVersion, VERSION } from "./version.js?v=0.7.0";
-import * as db from "./db.js?v=0.7.0";
-import { buildSessionZip } from "./export.js?v=0.7.0";
-import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.7.0";
-import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.7.0";
-import { TARGETS } from "./targets.js?v=0.7.0";
+import { showVersion, VERSION } from "./version.js?v=0.7.1";
+import * as db from "./db.js?v=0.7.1";
+import { buildSessionZip } from "./export.js?v=0.7.1";
+import { checkForCrash, makeSphere } from "./make-sphere.js?v=0.7.1";
+import { STITCH_DEFAULTS } from "./stitch-settings.js?v=0.7.1";
+import { TARGETS } from "./targets.js?v=0.7.1";
 import {
   angleBetween,
   axisAngle,
   cameraDirection,
   CircularMean,
+  compassPoint,
   conjugate,
   directionFromYawPitch,
   fromDeviceOrientation,
@@ -16,7 +17,7 @@ import {
   rotate,
   wrapDeg,
   yawPitchFromDirection,
-} from "./quat.js?v=0.7.0";
+} from "./quat.js?v=0.7.1";
 
 showVersion();
 db.requestPersistentStorage();
@@ -32,6 +33,11 @@ const BURST_FRAMES = 4; // frames compared for each photo; the sharpest is kept
 const SHARPNESS_PATCH = 384; // size of the middle patch used to judge sharpness
 const COMPASS_SAMPLES_NEEDED = 45; // ~0.75 s of compass readings to line up a resumed capture
 const COMPASS_WAIT_MS = 4000; // give up on the compass after this and assume no shift
+
+// Path mode (Sphere Walk, opened as capture.html?path=<id>): spheres are captured a few steps
+// apart, and the walk to each one (steps and compass direction) is saved with it.
+const PATH_ID = new URLSearchParams(location.search).get("path");
+const HEADING_WINDOW_MS = 1000; // compass readings averaged when the walk is recorded
 
 const $ = (id) => document.getElementById(id);
 const video = $("camera");
@@ -65,11 +71,16 @@ let anchor = null; // { dir, t }: where the phone was when it last stopped movin
 let ringSince = null;
 let holdProgress = 0;
 
+let pathCount = 0; // path mode: index the next sphere gets
+let pendingWalk = null; // path mode: the walk recorded for the sphere about to be captured
+let walkSteps = 3;
+let walkHeadings = []; // recent compass readings on the walk screen
+
 const view = { w: 0, h: 0, dpr: 1, f: 1 };
 
 // ---------- Start screen ----------
 
-$("new-button").addEventListener("click", () => beginCapture(null));
+$("new-button").addEventListener("click", () => (PATH_ID && pathCount > 0 ? openWalkScreen() : beginCapture(null)));
 $("finished-back").addEventListener("click", () => showStartScreen());
 $("finished-export").addEventListener("click", () => openExport(finishedSessionId));
 $("finished-retry").addEventListener("click", () => buildSphere(finishedSessionId));
@@ -78,6 +89,17 @@ $("undo-button").addEventListener("click", undoLastShot);
 $("done-button").addEventListener("click", finishCapture);
 $("export-close").addEventListener("click", closeExport);
 $("share-button").addEventListener("click", shareExport);
+$("walk-fewer").addEventListener("click", () => setWalkSteps(walkSteps - 1));
+$("walk-more").addEventListener("click", () => setWalkSteps(walkSteps + 1));
+$("walk-next").addEventListener("click", captureNextOnPath);
+
+if (PATH_ID) {
+  document.querySelector("#start-screen h1").textContent = "Capture a path";
+  document.querySelector("#start-screen .tip").textContent =
+    "Capture a sphere at each spot along your path, a few steps apart. Between spheres you'll walk, and the app records how far and which way.";
+  $("start-back").href = "sphere-walk/paths.html?v=0.2.0";
+  $("start-back").textContent = "← Paths";
+}
 
 const crash = checkForCrash();
 showStartScreen(
@@ -100,6 +122,11 @@ async function showStartScreen(message = "") {
     console.error(err);
     $("start-error").textContent = "Couldn't open saved captures on this device.";
   }
+  if (PATH_ID) {
+    sessions = sessions.filter((s) => s.path?.id === PATH_ID);
+    pathCount = Math.max(-1, ...sessions.map((s) => s.path.index)) + 1;
+    $("new-button").textContent = `Capture sphere ${pathCount + 1}`;
+  }
   if (sessions.length === 0) {
     const li = document.createElement("li");
     li.className = "empty";
@@ -114,7 +141,7 @@ function sessionRow(s) {
   const when = new Date(s.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   const status = s.status === "complete" ? "finished" : "unfinished";
   li.innerHTML = `<div class="session-title"></div><div class="session-meta"></div><div class="session-actions"></div>`;
-  li.querySelector(".session-title").textContent = when;
+  li.querySelector(".session-title").textContent = s.path ? `Path sphere ${s.path.index + 1} · ${when}` : when;
   li.querySelector(".session-meta").textContent = `${s.shotCount ?? 0} / ${TARGETS.length} photos · ${status}`;
   const actions = li.querySelector(".session-actions");
   if (s.status !== "complete") actions.append(button("Continue", () => beginCapture(s)));
@@ -142,6 +169,7 @@ function button(label, onClick) {
 function showScreen(name) {
   $("start-screen").hidden = name !== "start";
   $("finished-screen").hidden = name !== "finished";
+  $("walk-screen").hidden = name !== "walk";
   $("capture-ui").hidden = name !== "capture";
   overlay.hidden = name !== "capture";
 }
@@ -225,6 +253,11 @@ function newSession() {
     targetCount: TARGETS.length,
     shotCount: 0,
     segments: [],
+    // Path mode: which sphere of the path this is, and the walk from the previous one
+    // (steps, and the compass direction the camera faced while walking; null for the first).
+    ...(PATH_ID && {
+      path: { id: PATH_ID, index: pathCount, steps: null, headingDeg: null, ...pendingWalk },
+    }),
   };
 }
 
@@ -283,7 +316,71 @@ async function finishCapture() {
   stopCamera();
   releaseWakeLock();
   frameCanvas.width = frameCanvas.height = 0; // free the 12-megapixel photo buffer before stitching
+  if (PATH_ID && session.path) {
+    // Path mode: walk on to the next spot; spheres are made later from the list.
+    pathCount = Math.max(pathCount, session.path.index + 1);
+    openWalkScreen(`Sphere ${session.path.index + 1} saved.`);
+    return;
+  }
   buildSphere(session.id);
+}
+
+// ---------- Path mode: walking between spheres ----------
+
+async function openWalkScreen(message = "") {
+  $("start-error").textContent = "";
+  try {
+    // Needed for the compass; iOS only asks from a tap, so this must be the first await.
+    if (!listening) await requestOrientationPermission();
+  } catch (err) {
+    $("start-error").textContent = explain(err);
+    return;
+  }
+  walkHeadings = [];
+  $("walk-saved").textContent = message;
+  $("walk-heading").textContent = "Compass: hold the phone upright…";
+  setWalkSteps(walkSteps);
+  showScreen("walk");
+}
+
+function setWalkSteps(n) {
+  walkSteps = Math.max(1, Math.min(20, n));
+  $("walk-steps").textContent = walkSteps;
+  $("walk-steps-text").textContent = walkSteps;
+}
+
+// Keeps the last second of compass readings while the phone is held upright, camera forward.
+function trackWalkHeading() {
+  const now = performance.now();
+  walkHeadings = walkHeadings.filter((h) => now - h.t < HEADING_WINDOW_MS);
+  const { heading, headingAccuracy } = latest;
+  if (heading != null && headingAccuracy != null && headingAccuracy >= 0) {
+    if (Math.abs(yawPitchFromDirection(camDir).pitch) <= 60) walkHeadings.push({ t: now, heading, accuracy: headingAccuracy });
+  }
+  const walk = recordedWalk();
+  let text = "Compass: hold the phone upright, camera forward.";
+  if (walk.headingDeg != null) {
+    text = `Facing ${Math.round(walk.headingDeg)}° (${compassPoint(walk.headingDeg)})`;
+    if (walk.headingAccuracyDeg > 25) text += ` · compass unsure (±${Math.round(walk.headingAccuracyDeg)}°): wave the phone in a figure 8`;
+  }
+  setText($("walk-heading"), text);
+}
+
+function recordedWalk() {
+  const mean = new CircularMean();
+  walkHeadings.forEach((h) => mean.add(h.heading));
+  return {
+    steps: walkSteps,
+    headingDeg: mean.count ? (mean.mean() + 360) % 360 : null,
+    headingAccuracyDeg: mean.count ? Math.max(...walkHeadings.map((h) => h.accuracy)) : null,
+  };
+}
+
+async function captureNextOnPath() {
+  pendingWalk = recordedWalk();
+  await beginCapture(null);
+  if (capturing) pendingWalk = null;
+  else showScreen("start"); // shows why it couldn't start
 }
 
 // Stitches a session into a sphere on the phone, showing progress on the finished screen.
@@ -413,6 +510,7 @@ function onOrientation(e) {
   };
   q = fromDeviceOrientation(e.alpha, e.beta, e.gamma);
   camDir = cameraDirection(q);
+  if (!$("walk-screen").hidden) trackWalkHeading();
   if (!capturing) return;
   if (session.yaw0Deg == null) session.yaw0Deg = yawPitchFromDirection(camDir).yaw;
   trackCompass();

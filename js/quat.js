@@ -90,6 +90,11 @@ export function wrapDeg(deg) {
   return ((((deg + 180) % 360) + 360) % 360) - 180;
 }
 
+// Nearest of the 8 compass points for a heading in degrees ("N", "NE", ...).
+export function compassPoint(deg) {
+  return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+}
+
 // Average of angles that handles the 359° → 0° wrap-around.
 export class CircularMean {
   constructor() {

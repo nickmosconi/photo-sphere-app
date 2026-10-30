@@ -1,11 +1,11 @@
-import { showVersion } from "./version.js?v=0.7.0";
-import { grayCopy, refineOrientations } from "./align.js?v=0.7.0";
-import { computeGains, smallCopy } from "./exposure.js?v=0.7.0";
-import { Stitcher } from "./stitcher.js?v=0.7.0";
-import { PanoViewer } from "./viewer.js?v=0.7.0";
-import { loadSessionZip } from "./session-file.js?v=0.7.0";
-import { makeSyntheticSession } from "./synthetic.js?v=0.7.0";
-import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.7.0";
+import { showVersion } from "./version.js?v=0.7.1";
+import { grayCopy, refineOrientations } from "./align.js?v=0.7.1";
+import { computeGains, smallCopy } from "./exposure.js?v=0.7.1";
+import { Stitcher } from "./stitcher.js?v=0.7.1";
+import { PanoViewer } from "./viewer.js?v=0.7.1";
+import { loadSessionZip } from "./session-file.js?v=0.7.1";
+import { makeSyntheticSession } from "./synthetic.js?v=0.7.1";
+import { photoOrientation, STITCH_DEFAULTS as DEFAULTS } from "./stitch-settings.js?v=0.7.1";
 
 showVersion();
 

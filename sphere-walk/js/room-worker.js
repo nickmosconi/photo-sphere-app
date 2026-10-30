@@ -1,4 +1,4 @@
-import { renderRoom } from "./room.js?v=0.1.0";
+import { renderRoom } from "./room.js?v=0.2.0";
 
 // Draws the test room off the main thread, so the page stays responsive meanwhile.
 self.onmessage = (e) => {

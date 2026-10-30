@@ -1,8 +1,8 @@
-import { showVersion } from "./version.js?v=0.1.0";
-import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.7.0";
-import { EYE, EYE_HEIGHT } from "./room.js?v=0.1.0";
-import { compareDepth, depthFromPng, depthToPng, floorDistance } from "./depth-file.js?v=0.1.0";
-import { buildDepthMesh, depthColors, WalkViewer } from "./walk-viewer.js?v=0.1.0";
+import { showVersion } from "./version.js?v=0.2.0";
+import { decodeImage, imageToJpeg } from "../../js/images.js?v=0.7.1";
+import { EYE, EYE_HEIGHT } from "./room.js?v=0.2.0";
+import { compareDepth, depthFromPng, depthToPng, floorDistance } from "./depth-file.js?v=0.2.0";
+import { buildDepthMesh, depthColors, WalkViewer } from "./walk-viewer.js?v=0.2.0";
 
 showVersion();
 
@@ -44,7 +44,7 @@ loadRoom();
 // Draws the test room in the background (a few seconds on a phone), so the page stays responsive.
 function renderRoomInWorker(options) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./room-worker.js?v=0.1.0", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("./room-worker.js?v=0.2.0", import.meta.url), { type: "module" });
     worker.onmessage = (e) => {
       worker.terminate();
       resolve(e.data);

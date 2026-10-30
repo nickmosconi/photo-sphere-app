@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sphere Walk</title>
-  <link rel="stylesheet" href="../css/style.css?v=0.7.0">
-  <link rel="stylesheet" href="css/walk.css?v=0.1.0">
+  <link rel="stylesheet" href="../css/style.css?v=0.7.1">
+  <link rel="stylesheet" href="css/walk.css?v=0.2.0">
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
   </script>
@@ -14,7 +14,7 @@
   <div id="viewer" class="viewer-full"></div>
 
   <header class="walk-top">
-    <a class="ctl back" href="../?v=0.7.0">← Sphere Cam</a>
+    <a class="ctl back" href="../?v=0.7.1">← Sphere Cam</a>
     <div id="status" class="hint"></div>
     <button id="panel-button" class="ctl panel-toggle" type="button">Settings</button>
   </header>
@@ -41,6 +41,10 @@
       <p id="accuracy" class="muted small"></p>
     </section>
     <section>
+      <h2>Paths</h2>
+      <p><a href="paths.html?v=0.2.0">Capture a path of spheres →</a></p>
+    </section>
+    <section>
       <p class="button-row">
         <button id="reset-button" class="small-button" type="button">Back to the start</button>
         <button id="save-room-button" class="small-button" type="button">Download test room</button>
@@ -51,6 +55,6 @@
   <div id="stick" class="stick" aria-label="Move"><div class="knob"></div></div>
   <p class="walk-help">Drag to look · Stick, WASD or arrow keys to step · Q / E down / up</p>
 
-  <script type="module" src="js/walk.js?v=0.1.0"></script>
+  <script type="module" src="js/walk.js?v=0.2.0"></script>
 </body>
 </html>
